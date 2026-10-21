@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#090909">
   <meta name="description" content="ISB: Street Legacy — mobile open-world game prototype.">
   <title>ISB: Street Legacy</title>
-  <link rel="stylesheet" href="./css/main.css?v=8">
+  <link rel="stylesheet" href="./css/main.css?v=9">
   <link rel="stylesheet" href="./css/intro.css?v=7">
   <link rel="stylesheet" href="./css/menu.css?v=7">
   <!-- Local imports: place the official Three.js release files in vendor/three/ -->
@@ -92,6 +92,8 @@
     </div>
     <div id="move-stick-zone" class="move-stick-zone" aria-label="Movement joystick"><div class="joystick-ring"><div id="move-stick-knob" class="joystick-knob"></div></div></div>
     <div id="vertical-flight-controls" class="vertical-flight-controls" aria-label="Free camera flight controls"><button id="fly-up" type="button" aria-label="Fly up" title="Fly up">▲<span>UP</span></button><button id="fly-down" type="button" aria-label="Fly down" title="Fly down">▼<span>DOWN</span></button></div>
+    <div id="vehicle-enter-control" class="vehicle-enter-control hidden"><button id="vehicle-enter" type="button">ENTER CAR · E</button></div>
+    <div id="vehicle-driving-controls" class="vehicle-driving-controls hidden"><div id="vehicle-speed-readout" class="vehicle-speed-readout">0 KM/H</div><button id="vehicle-camera-toggle" type="button">CHASE CAMERA</button><button id="vehicle-exit" type="button">EXIT CAR · E</button></div>
     <section id="pause-panel" class="pause-panel hidden" aria-label="Paused game">
       <div class="pause-card"><p class="pause-eyebrow">ISB: STREET LEGACY</p><h2>PAUSED</h2><button id="resume-game" class="primary-button">RESUME GAME</button><button id="exit-to-menu" class="secondary-button">EXIT TO MENU</button></div>
     </section>
@@ -117,6 +119,6 @@
       }
     }, 10000);
   </script>
-  <script type="module" src="./js/main.js?v=17"></script>
+  <script type="module" src="./js/main.js?v=18"></script>
 </body>
 </html>
