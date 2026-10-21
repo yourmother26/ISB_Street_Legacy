@@ -47,7 +47,7 @@ async function start() {
         intro.classList.add('hidden');
         menu.classList.remove('hidden');
       }
-    }, 3200);
+    }, 6200);
   } catch (error) {
     showFatal(error);
   }
