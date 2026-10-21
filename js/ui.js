@@ -38,28 +38,46 @@ export function initUI({ engine, intro, menu, gameView }) {
   $('pause-game')?.addEventListener('click', pauseGame);
   $('resume-game')?.addEventListener('click', resumeGame);
   $('exit-to-menu')?.addEventListener('click', showMenu);
-  const resetJoystick = () => { joystickPointer = null; if (joystickKnob) joystickKnob.style.transform = 'translate(-50%, -50%)'; engine.setMoveInput(0, 0); };
-  joystickZone?.addEventListener('pointerdown', event => {
-    event.preventDefault(); event.stopPropagation();
-    joystickPointer = event.pointerId;
-    joystickZone.setPointerCapture?.(event.pointerId);
-    updateJoystick(event);
-  });
-  const updateJoystick = event => {
+  const resetJoystick = () => {
+    joystickPointer = null;
+    if (joystickKnob) joystickKnob.style.transform = 'translate(-50%, -50%)';
+    engine.setMoveInput(0, 0);
+  };
+  function updateJoystick(event) {
     if (joystickPointer !== event.pointerId || !joystickZone) return;
     event.preventDefault();
     const rect = joystickZone.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
-    const max = Math.min(rect.width, rect.height) * .31;
-    let dx = event.clientX - cx, dy = event.clientY - cy;
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const max = Math.min(rect.width, rect.height) * 0.34;
+    let dx = event.clientX - cx;
+    let dy = event.clientY - cy;
     const distance = Math.hypot(dx, dy);
-    if (distance > max) { dx = dx / distance * max; dy = dy / distance * max; }
-    if (joystickKnob) joystickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    if (distance > max) {
+      dx = (dx / distance) * max;
+      dy = (dy / distance) * max;
+    }
+    if (joystickKnob) {
+      joystickKnob.style.transform = 'translate(calc(-50% + ' + dx + 'px), calc(-50% + ' + dy + 'px))';
+    }
+    // X = strafe, negative Y = forward; engine rotates this input by camera yaw.
     engine.setMoveInput(dx / max, dy / max);
-  };
-  joystickZone?.addEventListener('pointermove', updateJoystick);
-  joystickZone?.addEventListener('pointerup', resetJoystick);
-  joystickZone?.addEventListener('pointercancel', resetJoystick);
+  }
+  joystickZone?.addEventListener('pointerdown', event => {
+    if (event.button !== undefined && event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    joystickPointer = event.pointerId;
+    try { joystickZone.setPointerCapture(event.pointerId); } catch (_) {}
+    updateJoystick(event);
+  }, { passive: false });
+  joystickZone?.addEventListener('pointermove', updateJoystick, { passive: false });
+  joystickZone?.addEventListener('pointerup', event => {
+    if (joystickPointer === event.pointerId) resetJoystick();
+  });
+  joystickZone?.addEventListener('pointercancel', event => {
+    if (joystickPointer === event.pointerId) resetJoystick();
+  });
   joystickZone?.addEventListener('lostpointercapture', resetJoystick);
   $('open-settings')?.addEventListener('click', () => settings.classList.remove('hidden'));
   $('open-socials')?.addEventListener('click', () => socials.classList.remove('hidden'));
