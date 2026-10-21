@@ -179,12 +179,13 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     addBox(parent, 'traffic signal housing', signalHousingMat, headX, 4.35, headZ, .48, 1.35, .36);
     const bulbs = [];
     const ys = [4.72, 4.35, 3.98];
+    const bulbMats = [redMat, amberMat, greenMat].map(material => material.clone());
     for (let i = 0; i < 3; i++) {
       const geo = new THREE.SphereGeometry(.13, 8, 6);
-      const bulb = new THREE.Mesh(geo, [redMat, amberMat, greenMat][i]);
+      const bulb = new THREE.Mesh(geo, bulbMats[i]);
       bulb.position.set(headX, ys[i], headZ + .2);
       parent.add(bulb);
-      bulbs.push(bulb);
+      bulbs.push({ bulb, material: bulbMats[i] });
     }
     trafficSignals.push({ bulbs, phaseOffset: rand() * 8 });
   }
@@ -389,6 +390,15 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     const lotSize = downtown ? 20 : industrial ? 21 : 19;
     const centers = [26, 48, 70];
     const lotJobs = [];
+    const usedBuildingNames = new Set();
+    const chooseUnused = (pool, seed) => {
+      const start = positiveMod(seed, pool.length);
+      for (let offset = 0; offset < pool.length; offset++) {
+        const candidate = pool[(start + offset) % pool.length];
+        if (!usedBuildingNames.has(candidate)) { usedBuildingNames.add(candidate); return candidate; }
+      }
+      return pool[start];
+    };
     let serial = positiveMod(cx * 11 + cz * 17, regularNames.length);
     for (let rz = 0; rz < 3; rz++) {
       for (let rx = 0; rx < 3; rx++) {
@@ -403,12 +413,12 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
         let name;
         let tower = false;
         if (downtown && lotRand() < .62) {
-          name = towerNames[positiveMod(serial + rx * 2 + rz * 3 + Math.floor(lotRand() * 5), towerNames.length)];
+          name = chooseUnused(towerNames, serial + rx * 2 + rz * 3 + Math.floor(lotRand() * 5));
           tower = true;
         } else if (!nearCenter) {
-          name = lowNames[positiveMod(serial + rx * 3 + rz * 5, lowNames.length)];
+          name = chooseUnused(lowNames, serial + rx * 3 + rz * 5);
         } else {
-          name = regularNames[positiveMod(serial + rx * 3 + rz * 5, regularNames.length)];
+          name = chooseUnused(regularNames, serial + rx * 3 + rz * 5);
         }
         serial += 3 + Math.floor(lotRand() * 4);
         const mainW = tower ? 15 + lotRand() * 6 : industrial ? 13 + lotRand() * 5 : commercial ? 9 + lotRand() * 6 : 8 + lotRand() * 5;
@@ -428,7 +438,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
       const secondaryOffsetZ = (job.lotRand() - .5) * 5;
       const hasAnnex = job.lotRand() > (suburban ? .38 : .62);
       job.annex = hasAnnex ? {
-        name: nearCenter ? regularNames[positiveMod(serial + job.rx * 5 + job.rz * 7, regularNames.length)] : lowNames[positiveMod(serial + job.rx * 5 + job.rz * 7, lowNames.length)],
+        name: chooseUnused(nearCenter ? regularNames : lowNames, serial + job.rx * 5 + job.rz * 7),
         x: job.x + (job.mainW * .55) * (job.lotRand() > .5 ? 1 : -1) + secondaryOffsetX,
         z: job.z + (job.mainD * .5) * (job.lotRand() > .5 ? 1 : -1) + secondaryOffsetZ,
         w: 5 + job.lotRand() * 5, d: 5 + job.lotRand() * 5, h: 4 + job.lotRand() * 7,
@@ -530,12 +540,11 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     for (const signal of trafficSignals) {
       const phase = (signalElapsed + signal.phaseOffset) % 16;
       let active = phase < 7 ? 2 : phase < 8 ? 1 : phase < 15 ? 0 : 1;
-      signal.bulbs.forEach((bulb, i) => {
+      signal.bulbs.forEach((item, i) => {
         const on = i === active;
-        const mat = [redMat, amberMat, greenMat][i];
-        mat.emissive.setHex(on ? [0xff1818, 0xffad18, 0x20ff62][i] : 0x000000);
-        mat.emissiveIntensity = on ? 2.4 : 0;
-        bulb.scale.setScalar(on ? 1.18 : 1);
+        item.material.emissive.setHex(on ? [0xff1818, 0xffad18, 0x20ff62][i] : 0x000000);
+        item.material.emissiveIntensity = on ? 2.4 : 0;
+        item.bulb.scale.setScalar(on ? 1.18 : 1);
       });
     }
   }
