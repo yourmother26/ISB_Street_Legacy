@@ -175,12 +175,6 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
   const chunks = new Map();
   const trafficSignals = [];
   const trafficControllers = new Map();
-  const trafficCars = [];
-  const carPaintMats = [0xd84c42, 0xe3e7ed, 0x1d78c1, 0xe2b93f, 0x2d353e, 0x4f9b68, 0x8e68bc, 0xe47b38].map(color => new THREE.MeshStandardMaterial({ color, roughness: .72, metalness: .08 }));
-  const carGlassMat = new THREE.MeshStandardMaterial({ color: 0x203847, roughness: .28, metalness: .1 });
-  const tyreMat = new THREE.MeshStandardMaterial({ color: 0x16191d, roughness: 1 });
-  const headlightMat = new THREE.MeshBasicMaterial({ color: 0xfff1c7 });
-  const tailLightMat = new THREE.MeshBasicMaterial({ color: 0xff3128 });
   function addTrafficSignal(parent, x, z, facing, rand, controller, axis) {
     const poleHeight = 5.2;
     addBox(parent, 'traffic signal pole', poleMat, x, poleHeight / 2, z, .19, poleHeight, .19);
@@ -201,40 +195,6 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     trafficSignals.push({ bulbs, controller, axis });
   }
 
-
-  function spawnTrafficCar(parent, ownerKey, axis, direction, roadX, roadZ, roadWidth, rand) {
-    const car = new THREE.Group();
-    car.name = 'traffic-ai-vehicle';
-    const paint = carPaintMats[Math.floor(rand() * carPaintMats.length)];
-    addBox(car, 'vehicle body', paint, 0, .82, 0, 3.65, .88, 1.62);
-    addBox(car, 'vehicle roof', paint, -.18, 1.42, 0, 1.9, .48, 1.35);
-    addBox(car, 'vehicle windshield', carGlassMat, .73, 1.43, 0, .12, .37, 1.18);
-    addBox(car, 'vehicle rear glass', carGlassMat, -1.08, 1.43, 0, .12, .34, 1.12);
-    addBox(car, 'vehicle front bumper', poleMat, 1.82, .59, 0, .16, .18, 1.48);
-    addBox(car, 'vehicle rear bumper', poleMat, -1.82, .59, 0, .16, .18, 1.48);
-    for (const side of [-1, 1]) {
-      for (const axle of [-1.18, 1.18]) addBox(car, 'vehicle wheel', tyreMat, axle, .38, side * .78, .62, .58, .2);
-      addBox(car, 'vehicle headlight', headlightMat, 1.79, .88, side * .49, .09, .2, .22);
-      addBox(car, 'vehicle tail light', tailLightMat, -1.8, .86, side * .49, .08, .2, .22);
-    }
-    const laneOffset = Math.min(roadWidth * .17, 4.0);
-    let x = roadX, z = roadZ, yaw = 0;
-    if (axis === 'x') {
-      z += direction * laneOffset;
-      x += (rand() - .5) * 22;
-      yaw = direction > 0 ? 0 : Math.PI;
-    } else {
-      x -= direction * laneOffset;
-      z += (rand() - .5) * 22;
-      yaw = direction > 0 ? -Math.PI / 2 : Math.PI / 2;
-    }
-    car.position.set(x, 0, z);
-    car.rotation.y = yaw;
-    parent.add(car);
-    const record = { group: car, ownerKey, axis, direction, x, z, yaw, maxSpeed: 7 + rand() * 4, speed: 0, laneOffset };
-    trafficCars.push(record);
-    return record;
-  }
 
   function addStreetLight(parent, x, z, alongX, rand) {
     const height = 6.3 + rand() * 1.4;
@@ -398,42 +358,6 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     if (hasSouthRoad) addRoadSegment(group, 'x', midX, z0 + CHUNK_Z, CHUNK_X, southWidth, rand, southWidth >= 24 ? 'boulevard' : style);
     if (hasWestRoad) addRoadSegment(group, 'z', x0, midZ, CHUNK_Z, westWidth, rand, westWidth >= 24 ? 'boulevard' : style);
     if (hasEastRoad) addRoadSegment(group, 'z', x0 + CHUNK_X, midZ, CHUNK_Z, eastWidth, rand, eastWidth >= 24 ? 'boulevard' : style);
-    // One traffic vehicle per continuous road axis in this chunk; distant chunks use the same low-poly cars.
-
-    // Occasional diagonal cut-throughs connect two boundary streets and break up the rigid grid.
-    if (hasNorthRoad) spawnTrafficCar(group, key, 'x', rand() > .5 ? 1 : -1, midX, z0, northWidth, rand);
-    if (hasWestRoad) spawnTrafficCar(group, key, 'z', rand() > .5 ? 1 : -1, x0, midZ, westWidth, rand);
-
-    const diagonalStreet = hasNorthRoad && hasWestRoad && positiveMod(cx * 3 + cz * 5, 5) === 0;
-    if (diagonalStreet) {
-      const diagonalLength = Math.sqrt(64 * 64 + 64 * 64);
-      const angle = Math.PI / 4;
-      const diagonalX = x0 + 32, diagonalZ = z0 + 32;
-      const roadGeo = new THREE.PlaneGeometry(diagonalLength, 9.5);
-      roadGeo.rotateX(-Math.PI / 2);
-      roadGeo.rotateY(angle);
-      const diagonalRoad = new THREE.Mesh(roadGeo, asphaltAltMat);
-      diagonalRoad.position.set(diagonalX, -.018, diagonalZ);
-      group.add(diagonalRoad);
-      for (const side of [-1, 1]) {
-        const offset = side * 6.1 / Math.sqrt(2);
-        const walkGeo = new THREE.PlaneGeometry(diagonalLength, 1.8);
-        walkGeo.rotateX(-Math.PI / 2);
-        walkGeo.rotateY(angle);
-        const walk = new THREE.Mesh(walkGeo, sidewalkMat);
-        walk.position.set(diagonalX + offset, .006, diagonalZ + offset);
-        group.add(walk);
-      }
-      for (let t = -39; t <= 39; t += 11) {
-        const dashGeo = new THREE.PlaneGeometry(4.5, .13);
-        dashGeo.rotateX(-Math.PI / 2);
-        dashGeo.rotateY(angle);
-        const dash = new THREE.Mesh(dashGeo, yellowPaint);
-        dash.position.set(diagonalX + t / Math.sqrt(2), .02, diagonalZ - t / Math.sqrt(2));
-        group.add(dash);
-      }
-    }
-
     // Intersection geometry only appears where both road axes really meet.
     if (hasNorthRoad && hasWestRoad) {
       const ix = x0, iz = z0;
@@ -503,7 +427,6 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
         if (industrial && roll < .36) continue;
         const x = x0 + centers[rx] + (lotRand() - .5) * 5.5;
         const z = z0 + centers[rz] + (lotRand() - .5) * 5.5;
-        if (diagonalStreet && Math.abs((x - x0) + (z - z0) - 64) < 13) continue;
         let name;
         let tower = false;
         if (downtown && lotRand() < .62) {
@@ -642,9 +565,6 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
       for (const [controllerKey, controller] of trafficControllers) {
         if (controller.ownerKey === key) trafficControllers.delete(controllerKey);
       }
-      for (let i = trafficCars.length - 1; i >= 0; i--) {
-        if (trafficCars[i].ownerKey === key) trafficCars.splice(i, 1);
-      }
       chunks.delete(key);
     }
   }
@@ -672,40 +592,6 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
         item.material.emissiveIntensity = on ? 2.4 : 0;
         item.bulb.scale.setScalar(on ? 1.18 : 1);
       });
-    }
-  }
-
-  function updateTrafficAI(dt) {
-    const controllers = Array.from(trafficControllers.values());
-    for (const car of trafficCars) {
-      const distanceToCamera = Math.hypot(car.x - camera.position.x, car.z - camera.position.z);
-      car.group.visible = distanceToCamera < 430;
-      if (!car.group.visible) continue;
-      let desiredSpeed = car.maxSpeed;
-      // Basic car-following: don't drive into another vehicle in the same lane.
-      for (const other of trafficCars) {
-        if (other === car || other.axis !== car.axis || other.direction !== car.direction) continue;
-        const lateral = car.axis === 'x' ? Math.abs(other.z - car.z) : Math.abs(other.x - car.x);
-        if (lateral > 2.2) continue;
-        const ahead = car.axis === 'x' ? (other.x - car.x) * car.direction : (other.z - car.z) * car.direction;
-        if (ahead > .1 && ahead < 9) desiredSpeed = Math.min(desiredSpeed, Math.max(0, (ahead - 3.8) * 1.3));
-      }
-      // Brake before a junction whenever the car's shared traffic signal is not green.
-      let nearestStop = Infinity;
-      for (const controller of controllers) {
-        const lateral = car.axis === 'x' ? Math.abs(controller.z - car.z) : Math.abs(controller.x - car.x);
-        if (lateral > 13) continue;
-        const ahead = car.axis === 'x' ? (controller.x - car.x) * car.direction : (controller.z - car.z) * car.direction;
-        if (ahead > .1 && ahead < 17 && ahead < nearestStop) {
-          nearestStop = ahead;
-          if (!axisHasGreen(controller, car.axis)) desiredSpeed = Math.min(desiredSpeed, Math.max(0, (ahead - 5.5) * 1.5));
-        }
-      }
-      car.speed += (desiredSpeed - car.speed) * Math.min(1, dt * (desiredSpeed < car.speed ? 4.8 : 1.5));
-      const step = car.speed * dt * car.direction;
-      if (car.axis === 'x') car.x += step;
-      else car.z += step;
-      car.group.position.set(car.x, 0, car.z);
     }
   }
 
@@ -778,7 +664,6 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
       camera.position.y = THREE.MathUtils.clamp(camera.position.y, 1.4, 220);
       updateStreaming();
       updateTrafficSignals(dt);
-      updateTrafficAI(dt);
     } else {
       updateTrafficSignals(dt);
     }
