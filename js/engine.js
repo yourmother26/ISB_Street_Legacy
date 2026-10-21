@@ -299,8 +299,10 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     // Unequal trees, hedges and planters break the identical-yard look.
     const trees = 1 + Math.floor(rand() * 4);
     for (let i = 0; i < trees; i++) {
-      const tx = x + (rand() - .5) * (size - 7);
-      const tz = z + (rand() - .5) * (size - 7);
+      const side = Math.floor(rand() * 4);
+      const edge = half - 2.1;
+      const tx = x + (side < 2 ? (side === 0 ? -edge : edge) : (rand() - .5) * (size - 7));
+      const tz = z + (side >= 2 ? (side === 2 ? -edge : edge) : (rand() - .5) * (size - 7));
       const trunkH = 1.8 + rand() * 1.8;
       addBox(parent, 'yard tree trunk', trunkMat, tx, trunkH / 2, tz, .25 + rand() * .18, trunkH, .25 + rand() * .18);
       const leaves = new THREE.Mesh(treeGeo, leafMat);
@@ -309,8 +311,9 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
       parent.add(leaves);
     }
     if (rand() > .35) {
-      const planterX = x + (rand() - .5) * size * .6;
-      const planterZ = z + (rand() - .5) * size * .6;
+      const side = Math.floor(rand() * 4);
+      const planterX = x + (side < 2 ? (side === 0 ? -half + 2 : half - 2) : (rand() - .5) * size * .45);
+      const planterZ = z + (side >= 2 ? (side === 2 ? -half + 2 : half - 2) : (rand() - .5) * size * .45);
       addBox(parent, 'garden planter', concreteMats[Math.floor(rand() * concreteMats.length)], planterX, .22, planterZ, 1.5 + rand(), .44, 1.1 + rand());
     }
   }
@@ -357,6 +360,8 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
       const offsetZ = northWidth / 2 + 2.5;
       addTrafficSignal(group, ix - offsetX, iz - offsetZ, 0, rand);
       addTrafficSignal(group, ix + offsetX, iz + offsetZ, Math.PI, rand);
+      addTrafficSignal(group, ix + offsetX, iz - offsetZ, Math.PI / 2, rand);
+      addTrafficSignal(group, ix - offsetX, iz + offsetZ, -Math.PI / 2, rand);
       // Corner islands on some major junctions.
       if (northWidth >= 24 && westWidth >= 24) {
         addPlane(group, grassMats[1], ix + 10, iz + 10, 4.2, 4.2, .018);
