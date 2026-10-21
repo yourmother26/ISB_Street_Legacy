@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const ASSET_BASE = new URL('../New%20Folder%201/Models/GLB%20format/', import.meta.url).href;
 const CHUNK_X = 96;
 const CHUNK_Z = 96;
-const BASE_LOAD_RADIUS = 2;
+const BASE_LOAD_RADIUS = 1;
 const WORLD_LIMIT = 4900;
 
 export async function initEngine(canvas, { onStats = () => {} } = {}) {
@@ -153,19 +153,19 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
   }
 
   // Roads are selected by shared edge IDs: adjoining chunks always agree on road presence and width.
-  function horizontalRoad(cz, cx) {
-    const r = seededRandom(cx, cz, 71)();
+  function horizontalRoad(cz) {
+    const r = seededRandom(0, cz, 71)();
     return positiveMod(cz, 4) === 0 || r > .24;
   }
-  function verticalRoad(cx, cz) {
-    const r = seededRandom(cx, cz, 93)();
+  function verticalRoad(cx) {
+    const r = seededRandom(cx, 0, 93)();
     return positiveMod(cx, 4) === 0 || r > .30;
   }
-  function horizontalWidth(cz, cx) {
-    return positiveMod(cz, 4) === 0 ? 25 : (positiveMod(cx + cz, 5) === 0 ? 19 : 13 + Math.floor(seededRandom(cx, cz, 21)() * 3));
+  function horizontalWidth(cz) {
+    return positiveMod(cz, 4) === 0 ? 25 : (positiveMod(cz, 5) === 0 ? 19 : 13 + Math.floor(seededRandom(0, cz, 21)() * 3));
   }
-  function verticalWidth(cx, cz) {
-    return positiveMod(cx, 4) === 0 ? 26 : (positiveMod(cx * 3 + cz, 6) === 0 ? 20 : 13 + Math.floor(seededRandom(cx, cz, 27)() * 3));
+  function verticalWidth(cx) {
+    return positiveMod(cx, 4) === 0 ? 26 : (positiveMod(cx, 6) === 0 ? 20 : 13 + Math.floor(seededRandom(cx, 0, 27)() * 3));
   }
 
   const chunks = new Map();
@@ -328,14 +328,14 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     const chunk = { key, cx, cz, group, pending: true };
     chunks.set(key, chunk);
 
-    const hasNorthRoad = horizontalRoad(cz, cx);
-    const hasSouthRoad = horizontalRoad(cz + 1, cx);
-    const hasWestRoad = verticalRoad(cx, cz);
-    const hasEastRoad = verticalRoad(cx + 1, cz);
-    const northWidth = horizontalWidth(cz, cx);
-    const southWidth = horizontalWidth(cz + 1, cx);
-    const westWidth = verticalWidth(cx, cz);
-    const eastWidth = verticalWidth(cx + 1, cz);
+    const hasNorthRoad = horizontalRoad(cz);
+    const hasSouthRoad = horizontalRoad(cz + 1);
+    const hasWestRoad = verticalRoad(cx);
+    const hasEastRoad = verticalRoad(cx + 1);
+    const northWidth = horizontalWidth(cz);
+    const southWidth = horizontalWidth(cz + 1);
+    const westWidth = verticalWidth(cx);
+    const eastWidth = verticalWidth(cx + 1);
     const roadWidths = [northWidth, southWidth, westWidth, eastWidth];
     const arterial = roadWidths.some(w => w >= 24);
     const style = arterial ? 'boulevard' : 'local';
@@ -386,8 +386,8 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     const industrial = !downtown && !commercial && districtRoll < .48;
     const suburban = !downtown && !commercial && !industrial;
     const district = downtown ? 'downtown' : commercial ? 'commercial' : industrial ? 'industrial' : 'suburban';
-    const lotSize = downtown ? 22 : industrial ? 27 : 25;
-    const centers = [18, 48, 78];
+    const lotSize = downtown ? 20 : industrial ? 21 : 19;
+    const centers = [26, 48, 70];
     const lotJobs = [];
     let serial = positiveMod(cx * 11 + cz * 17, regularNames.length);
     for (let rz = 0; rz < 3; rz++) {
@@ -411,9 +411,9 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
           name = regularNames[positiveMod(serial + rx * 3 + rz * 5, regularNames.length)];
         }
         serial += 3 + Math.floor(lotRand() * 4);
-        const mainW = tower ? 18 + lotRand() * 7 : industrial ? 17 + lotRand() * 7 : 10 + lotRand() * 8;
-        const mainD = tower ? 18 + lotRand() * 7 : industrial ? 17 + lotRand() * 7 : 10 + lotRand() * 8;
-        const mainH = tower ? 105 + lotRand() * 85 : commercial ? 24 + lotRand() * 25 : suburban ? 10 + lotRand() * 12 : 25 + lotRand() * 15;
+        const mainW = tower ? 15 + lotRand() * 6 : industrial ? 13 + lotRand() * 5 : commercial ? 9 + lotRand() * 6 : 8 + lotRand() * 5;
+        const mainD = tower ? 15 + lotRand() * 6 : industrial ? 13 + lotRand() * 5 : commercial ? 9 + lotRand() * 6 : 8 + lotRand() * 5;
+        const mainH = tower ? 105 + lotRand() * 85 : commercial ? 24 + lotRand() * 25 : suburban ? 8 + lotRand() * 11 : 25 + lotRand() * 15;
         lotJobs.push({ x, z, name, tower, mainW, mainD, mainH, yaw: Math.floor(lotRand() * 4) * Math.PI / 2, lotRand, rx, rz });
       }
     }
@@ -421,7 +421,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     // Vary property boundaries and setbacks so yards don't all share the same silhouette.
     for (const job of lotJobs) {
       if (job.tower) continue;
-      const propertySize = (suburban ? 23 : 20) + job.lotRand() * 6;
+      const propertySize = (suburban ? 16 : 15) + job.lotRand() * 4;
       if (suburban || job.lotRand() > .4) addProperty(group, job.x, job.z, propertySize, job.lotRand, district);
       // Main structure.
       const secondaryOffsetX = (job.lotRand() - .5) * 5;
@@ -493,7 +493,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
 
   let lastChunkX = NaN, lastChunkZ = NaN, lastRadius = -1;
   function updateStreaming(force = false) {
-    const radius = Math.min(4, BASE_LOAD_RADIUS + Math.floor(Math.max(0, camera.position.y - 25) / 55));
+    const radius = Math.min(3, BASE_LOAD_RADIUS + Math.floor(Math.max(0, camera.position.y - 25) / 65));
     const centerX = Math.floor(camera.position.x / CHUNK_X);
     const centerZ = Math.floor(camera.position.z / CHUNK_Z);
     if (!force && centerX === lastChunkX && centerZ === lastChunkZ && radius === lastRadius) return;
