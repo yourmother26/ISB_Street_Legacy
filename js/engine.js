@@ -164,25 +164,24 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
   let dragMode = 'look';
   let lastX = 0, lastY = 0;
   let moveX = 0, moveY = 0;
+  let paused = false;
   const keys = new Set();
   const onKeyDown = e => {
-    if (['w','a','s','d','ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) {
+    if (['w','a','s','d','ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Shift'].includes(e.key)) {
       if (e.key === ' ' || e.key.startsWith('Arrow')) e.preventDefault();
       keys.add(e.key.toLowerCase());
     }
   };
   const onKeyUp = e => keys.delete(e.key.toLowerCase());
   const onPointerDown = e => {
+    if (paused || e.clientX < window.innerWidth * .38) return;
     dragging = true;
+    dragMode = 'look';
     lastX = e.clientX; lastY = e.clientY;
-    dragMode = e.pointerType !== 'mouse' && e.clientX < window.innerWidth * .43 ? 'move' : 'look';
-    if (dragMode === 'move') {
-      moveX = 0; moveY = 0;
-    }
     canvas.setPointerCapture?.(e.pointerId);
   };
   const onPointerMove = e => {
-    if (!dragging) return;
+    if (!dragging || paused) return;
     const dx = e.clientX - lastX, dy = e.clientY - lastY;
     if (dragMode === 'look') {
       yaw -= dx * .0042;
@@ -232,6 +231,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
       frames = 0; sampleStart = now;
       onStats({ fps, frameMs, renderer: 'WebGL · free cam' });
     }
+    if (paused) { renderer.render(scene, camera); return; }
     let forward = (keys.has('w') || keys.has('arrowup') ? 1 : 0) - (keys.has('s') || keys.has('arrowdown') ? 1 : 0) - moveY;
     let strafe = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0) + moveX;
     const length = Math.hypot(forward, strafe);
@@ -248,6 +248,8 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
 
   return {
     renderer, scene, camera,
+    setMoveInput(x, y) { moveX = THREE.MathUtils.clamp(x, -1, 1); moveY = THREE.MathUtils.clamp(y, -1, 1); },
+    setPaused(value) { paused = Boolean(value); if (paused) { keys.clear(); moveX = 0; moveY = 0; dragging = false; } },
     setQuality(level) {
       const ratio = level === 'high' ? 1.3 : level === 'low' ? .8 : 1.05;
       renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * ratio, 1.25));
