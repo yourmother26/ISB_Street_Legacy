@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#090909">
   <meta name="description" content="ISB: Street Legacy — mobile open-world game prototype.">
   <title>ISB: Street Legacy</title>
-  <link rel="stylesheet" href="./css/main.css?v=4">
-  <link rel="stylesheet" href="./css/intro.css?v=4">
-  <link rel="stylesheet" href="./css/menu.css?v=4">
+  <link rel="stylesheet" href="./css/main.css?v=5">
+  <link rel="stylesheet" href="./css/intro.css?v=5">
+  <link rel="stylesheet" href="./css/menu.css?v=5">
   <!-- Local imports: place the official Three.js release files in vendor/three/ -->
   <script type="importmap">
   {
@@ -36,18 +36,18 @@
   </section>
 
   <main id="menu" class="menu hidden">
-    <div class="menu-top"><div class="mini-logo">ISB<span>:</span></div><div class="version">EARLY BUILD 0.1</div></div>
+    <div class="menu-top"><div class="mini-logo">ISB<span>:</span></div></div>
     <div class="menu-copy">
       <p class="eyebrow">A CITY IS WAITING</p>
       <h1>STREET<br><span>LEGACY</span></h1>
       <p class="menu-description">Build the world. Earn your place.</p>
       <div class="menu-actions">
-        <button id="start-game" class="primary-button">ENTER TEST WORLD <span>↗</span></button>
-        <button id="open-settings" class="secondary-button">GRAPHICS & SETTINGS</button>
-        <button id="open-credits" class="secondary-button">PROJECT NOTES</button>
+        <button id="start-game" class="primary-button">START NEW GAME <span>↗</span></button>
+        <button id="continue-game" class="secondary-button">CONTINUE FROM LAST SAVED</button>
+        <button id="open-settings" class="secondary-button">GRAPHICS &amp; SETTINGS</button>
+        <button id="open-socials" class="secondary-button">SOCIALS</button>
       </div>
     </div>
-    <div class="menu-bottom"><span>ISB ORIGINAL PROJECT</span><span id="menu-performance">FPS --</span></div>
   </main>
 
   <section id="settings-panel" class="overlay hidden">
@@ -64,12 +64,12 @@
     </div>
   </section>
 
-  <section id="credits-panel" class="overlay hidden">
+  <section id="socials-panel" class="overlay hidden">
     <div class="panel">
-      <button class="close-button" data-close="credits-panel" aria-label="Close">×</button>
-      <p class="eyebrow">DEVELOPMENT STATUS</p><h2>Wave 1</h2>
-      <p>This is the foundation build: local engine boot, intro/menu shell, 3D test scene, resize handling and performance monitoring.</p>
-      <p class="note">Character, city assets, vehicles and missions are later milestones. No feature is considered finished until it is tested.</p>
+      <button class="close-button" data-close="socials-panel" aria-label="Close">×</button>
+      <p class="eyebrow">STAY CONNECTED</p>
+      <h2>ISB: Street Legacy socials</h2>
+      <p>Official social links will be added here when they are ready.</p>
     </div>
   </section>
 
@@ -104,6 +104,6 @@
       }
     }, 10000);
   </script>
-  <script type="module" src="./js/main.js?v=4"></script>
+  <script type="module" src="./js/main.js?v=5"></script>
 </body>
 </html>
