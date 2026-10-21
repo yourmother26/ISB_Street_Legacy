@@ -3,11 +3,19 @@ export function initUI({ engine, intro, menu, gameView }) {
   const settings = $('settings-panel');
   const socials = $('socials-panel');
   const continuePanel = $('continue-panel');
+  const pausePanel = $('pause-panel');
+  const joystickZone = $('move-stick-zone');
+  const joystickKnob = $('move-stick-knob');
+  let joystickPointer = null;
 
   const showMenu = () => {
+    engine.setPaused(false);
+    pausePanel?.classList.add('hidden');
     gameView.classList.add('hidden');
     menu.classList.remove('hidden');
   };
+  const pauseGame = () => { engine.setPaused(true); pausePanel?.classList.remove('hidden'); };
+  const resumeGame = () => { pausePanel?.classList.add('hidden'); engine.setPaused(false); };
   const enterWorld = () => {
     // Mobile browsers may only permit orientation locking after a user gesture.
     try {
@@ -27,7 +35,32 @@ export function initUI({ engine, intro, menu, gameView }) {
   });
   $('start-game')?.addEventListener('click', enterWorld);
   $('continue-game')?.addEventListener('click', () => continuePanel.classList.remove('hidden'));
-  $('back-to-menu')?.addEventListener('click', showMenu);
+  $('pause-game')?.addEventListener('click', pauseGame);
+  $('resume-game')?.addEventListener('click', resumeGame);
+  $('exit-to-menu')?.addEventListener('click', showMenu);
+  const resetJoystick = () => { joystickPointer = null; if (joystickKnob) joystickKnob.style.transform = 'translate(-50%, -50%)'; engine.setMoveInput(0, 0); };
+  joystickZone?.addEventListener('pointerdown', event => {
+    event.preventDefault(); event.stopPropagation();
+    joystickPointer = event.pointerId;
+    joystickZone.setPointerCapture?.(event.pointerId);
+    updateJoystick(event);
+  });
+  const updateJoystick = event => {
+    if (joystickPointer !== event.pointerId || !joystickZone) return;
+    event.preventDefault();
+    const rect = joystickZone.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    const max = Math.min(rect.width, rect.height) * .31;
+    let dx = event.clientX - cx, dy = event.clientY - cy;
+    const distance = Math.hypot(dx, dy);
+    if (distance > max) { dx = dx / distance * max; dy = dy / distance * max; }
+    if (joystickKnob) joystickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    engine.setMoveInput(dx / max, dy / max);
+  };
+  joystickZone?.addEventListener('pointermove', updateJoystick);
+  joystickZone?.addEventListener('pointerup', resetJoystick);
+  joystickZone?.addEventListener('pointercancel', resetJoystick);
+  joystickZone?.addEventListener('lostpointercapture', resetJoystick);
   $('open-settings')?.addEventListener('click', () => settings.classList.remove('hidden'));
   $('open-socials')?.addEventListener('click', () => socials.classList.remove('hidden'));
   document.querySelectorAll('[data-close]').forEach(button => {
