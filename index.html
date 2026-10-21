@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#090909">
+  <meta name="description" content="ISB: Street Legacy — mobile open-world game prototype.">
+  <title>ISB: Street Legacy</title>
+  <link rel="stylesheet" href="./css/main.css">
+  <link rel="stylesheet" href="./css/intro.css">
+  <link rel="stylesheet" href="./css/menu.css">
+  <!-- Local imports: place the official Three.js release files in vendor/three/ -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/build/three.module.js",
+      "three/addons/": "./vendor/three/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="boot-screen" class="boot-screen">
+    <div class="boot-mark">ISB<span>:</span> <strong>STREET LEGACY</strong></div>
+    <p class="boot-tagline">ISB: STREET LEGACY</p>
+    <div class="boot-track"><div id="boot-progress"></div></div>
+    <p id="boot-status" class="boot-status">Starting local game shell…</p>
+  </div>
+
+  <section id="intro" class="intro hidden" aria-label="Game intro">
+    <div class="intro-grid"></div>
+    <div class="intro-line"></div>
+    <div class="intro-lockup" id="intro-logo"><div class="intro-logo"><span>ISB</span><i>:</i></div><div class="intro-subtitle">STREET LEGACY</div></div>
+    <div class="intro-caption">AN ORIGINAL OPEN-WORLD PROJECT</div>
+    <button id="skip-intro" class="skip-button">SKIP INTRO</button>
+  </section>
+
+  <main id="menu" class="menu hidden">
+    <div class="menu-top"><div class="mini-logo">ISB<span>:</span></div><div class="version">EARLY BUILD 0.1</div></div>
+    <div class="menu-copy">
+      <p class="eyebrow">A CITY IS WAITING</p>
+      <h1>STREET<br><span>LEGACY</span></h1>
+      <p class="menu-description">Build the world. Earn your place.</p>
+      <div class="menu-actions">
+        <button id="start-game" class="primary-button">ENTER TEST WORLD <span>↗</span></button>
+        <button id="open-settings" class="secondary-button">GRAPHICS & SETTINGS</button>
+        <button id="open-credits" class="secondary-button">PROJECT NOTES</button>
+      </div>
+    </div>
+    <div class="menu-bottom"><span>ISB ORIGINAL PROJECT</span><span id="menu-performance">FPS --</span></div>
+  </main>
+
+  <section id="settings-panel" class="overlay hidden">
+    <div class="panel">
+      <button class="close-button" data-close="settings-panel" aria-label="Close">×</button>
+      <p class="eyebrow">PERFORMANCE FIRST</p><h2>Graphics settings</h2>
+      <label for="quality">Quality preset</label>
+      <select id="quality">
+        <option value="low">Low — smoother performance</option>
+        <option value="medium" selected>Medium — balanced</option>
+        <option value="high">High — test carefully</option>
+      </select>
+      <p class="note">Settings affect this prototype's renderer. Stable 30 FPS is the first target; 60 FPS is not guaranteed.</p>
+    </div>
+  </section>
+
+  <section id="credits-panel" class="overlay hidden">
+    <div class="panel">
+      <button class="close-button" data-close="credits-panel" aria-label="Close">×</button>
+      <p class="eyebrow">DEVELOPMENT STATUS</p><h2>Wave 1</h2>
+      <p>This is the foundation build: local engine boot, intro/menu shell, 3D test scene, resize handling and performance monitoring.</p>
+      <p class="note">Character, city assets, vehicles and missions are later milestones. No feature is considered finished until it is tested.</p>
+    </div>
+  </section>
+
+  <div id="game-view" class="game-view hidden">
+    <canvas id="game-canvas"></canvas>
+    <div class="game-hud">
+      <div class="hud-brand">ISB<span>:</span> STREET LEGACY <small>FOUNDATION TEST</small></div>
+      <div class="hud-stats"><span id="fps-readout">FPS --</span><span id="renderer-readout">Starting renderer…</span></div>
+      <div class="hud-tip">DRAG TO LOOK · PINCH/SCROLL NOT REQUIRED</div>
+      <button id="back-to-menu" class="hud-button">← MENU</button>
+    </div>
+    <div id="scene-label" class="scene-label">TEST ENVIRONMENT</div>
+  </div>
+
+  <div id="fatal-error" class="fatal-error hidden" role="alert">
+    <h2>Game could not start</h2>
+    <p id="fatal-message">Check the local server and Three.js files.</p>
+    <p class="note">Confirm that vendor/three/build/three.module.js exists and the full matching examples/jsm folder was copied from the same official release.</p>
+  </div>
+
+  <script>
+    // A module import failure can prevent main.js from running at all.
+    // This watchdog makes that failure visible without requiring the console.
+    window.setTimeout(function () {
+      var boot = document.getElementById('boot-screen');
+      if (boot && !boot.classList.contains('hidden')) {
+        boot.classList.add('hidden');
+        var fatal = document.getElementById('fatal-error');
+        var message = document.getElementById('fatal-message');
+        message.textContent = 'Startup timed out. Check that vendor/three/build/three.module.js exists, that the matching examples/jsm folder was copied, and that the game is opened through the local server.';
+        fatal.classList.remove('hidden');
+      }
+    }, 10000);
+  </script>
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
