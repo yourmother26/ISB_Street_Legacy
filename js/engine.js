@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const ASSET_BASE = new URL('../New%20Folder%201/Models/GLB%20format/', import.meta.url).href;
 const CHUNK_X = 42;
 const CHUNK_Z = 48;
-const LOAD_RADIUS = 2; // 5 x 5 nearby cells; distant cells are removed.
+const BASE_LOAD_RADIUS = 2; // Expand the loaded view when flying high.
 const WORLD_LIMIT = 4900;
 
 export async function initEngine(canvas, { onStats = () => {} } = {}) {
@@ -18,8 +18,8 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x9fc8e8);
-  scene.fog = new THREE.Fog(0x9fc8e8, 130, 310);
-  const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 520);
+  scene.fog = new THREE.Fog(0x9fc8e8, 260, 1250);
+  const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 1600);
   camera.position.set(0, 2.2, 14);
 
   scene.add(new THREE.HemisphereLight(0xd7edff, 0x69735d, 2.1));
@@ -259,6 +259,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
   const chunks = new Map();
   let lastChunkX = NaN, lastChunkZ = NaN, streamBusy = false;
   function updateStreaming(force = false) {
+    const LOAD_RADIUS = Math.min(5, BASE_LOAD_RADIUS + Math.floor(Math.max(0, camera.position.y - 20) / 35));
     const centerX = Math.floor(camera.position.x / CHUNK_X);
     const centerZ = Math.floor(camera.position.z / CHUNK_Z);
     if (!force && centerX === lastChunkX && centerZ === lastChunkZ) return;
@@ -303,8 +304,9 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
   let moveX = 0, moveY = 0;
   let paused = false;
   const keys = new Set();
+  let verticalInput = 0;
   const onKeyDown = e => {
-    if (['w','a','s','d','ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Shift'].includes(e.key)) {
+    if (['w','a','s','d','ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Shift','Control','q','e'].includes(e.key)) {
       if (e.key === ' ' || e.key.startsWith('Arrow')) e.preventDefault();
       keys.add(e.key.toLowerCase());
     }
@@ -324,7 +326,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     lastX = e.clientX; lastY = e.clientY;
   };
   const onPointerUp = () => { dragging = false; };
-  const onWheel = e => { camera.position.y = THREE.MathUtils.clamp(camera.position.y + e.deltaY * .008, 1.4, 30); };
+  const onWheel = e => { camera.position.y = THREE.MathUtils.clamp(camera.position.y + e.deltaY * .035, 1.4, 220); };
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointermove', onPointerMove);
   canvas.addEventListener('pointerup', onPointerUp);
@@ -368,7 +370,10 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
       const speed = (keys.has('shift') ? 24 : 11) * dt;
       camera.position.x = THREE.MathUtils.clamp(camera.position.x + (Math.sin(yaw) * forward + Math.cos(yaw) * strafe) * speed, -WORLD_LIMIT, WORLD_LIMIT);
       camera.position.z = THREE.MathUtils.clamp(camera.position.z + (-Math.cos(yaw) * forward + Math.sin(yaw) * strafe) * speed, -WORLD_LIMIT, WORLD_LIMIT);
-      camera.position.y = THREE.MathUtils.clamp(camera.position.y, 1.4, 30);
+      const ascend = keys.has(' ') || keys.has('e') || verticalInput > 0;
+      const descend = keys.has('control') || keys.has('q') || verticalInput < 0;
+      if (ascend !== descend) camera.position.y += (ascend ? 1 : -1) * (keys.has('shift') ? 42 : 22) * dt;
+      camera.position.y = THREE.MathUtils.clamp(camera.position.y, 1.4, 220);
       updateStreaming();
     }
     const lookDir = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
@@ -380,7 +385,8 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
   return {
     renderer, scene, camera,
     setMoveInput(x, y) { moveX = THREE.MathUtils.clamp(x, -1, 1); moveY = THREE.MathUtils.clamp(y, -1, 1); },
-    setPaused(value) { paused = Boolean(value); if (paused) { keys.clear(); moveX = 0; moveY = 0; dragging = false; } },
+    setVerticalInput(value) { verticalInput = THREE.MathUtils.clamp(value, -1, 1); },
+    setPaused(value) { paused = Boolean(value); if (paused) { keys.clear(); moveX = 0; moveY = 0; verticalInput = 0; dragging = false; } },
     setQuality(level) {
       const ratio = level === 'high' ? 1.2 : level === 'low' ? .75 : 1;
       renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * ratio, 1.15));
