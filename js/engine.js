@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const ASSET_BASE = new URL('../New%20Folder%201/Models/GLB%20format/', import.meta.url).href;
 const CHUNK_X = 96;
 const CHUNK_Z = 96;
-const BASE_LOAD_RADIUS = 1;
+const BASE_LOAD_RADIUS = 2;
 const WORLD_LIMIT = 4900;
 
 export async function initEngine(canvas, { onStats = () => {} } = {}) {
@@ -16,7 +16,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xa8cce8);
-  scene.fog = new THREE.Fog(0xa8cce8, 320, 1450);
+  scene.fog = new THREE.Fog(0xa8cce8, 180, 360);
   const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 1800);
   camera.position.set(0, 2.2, 14);
 
@@ -174,8 +174,14 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
 
   const chunks = new Map();
   const trafficSignals = [];
-  const clock = new THREE.Clock();
-  function addTrafficSignal(parent, x, z, facing, rand) {
+  const trafficControllers = new Map();
+  const trafficCars = [];
+  const carPaintMats = [0xd84c42, 0xe3e7ed, 0x1d78c1, 0xe2b93f, 0x2d353e, 0x4f9b68, 0x8e68bc, 0xe47b38].map(color => new THREE.MeshStandardMaterial({ color, roughness: .72, metalness: .08 }));
+  const carGlassMat = new THREE.MeshStandardMaterial({ color: 0x203847, roughness: .28, metalness: .1 });
+  const tyreMat = new THREE.MeshStandardMaterial({ color: 0x16191d, roughness: 1 });
+  const headlightMat = new THREE.MeshBasicMaterial({ color: 0xfff1c7 });
+  const tailLightMat = new THREE.MeshBasicMaterial({ color: 0xff3128 });
+  function addTrafficSignal(parent, x, z, facing, rand, controller, axis) {
     const poleHeight = 5.2;
     addBox(parent, 'traffic signal pole', poleMat, x, poleHeight / 2, z, .19, poleHeight, .19);
     const headX = x + Math.cos(facing) * .62;
@@ -192,7 +198,42 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
       parent.add(bulb);
       bulbs.push({ bulb, material: bulbMats[i] });
     }
-    trafficSignals.push({ bulbs, phaseOffset: rand() * 8 });
+    trafficSignals.push({ bulbs, controller, axis });
+  }
+
+
+  function spawnTrafficCar(parent, ownerKey, axis, direction, roadX, roadZ, roadWidth, rand) {
+    const car = new THREE.Group();
+    car.name = 'traffic-ai-vehicle';
+    const paint = carPaintMats[Math.floor(rand() * carPaintMats.length)];
+    addBox(car, 'vehicle body', paint, 0, .82, 0, 3.65, .88, 1.62);
+    addBox(car, 'vehicle roof', paint, -.18, 1.42, 0, 1.9, .48, 1.35);
+    addBox(car, 'vehicle windshield', carGlassMat, .73, 1.43, 0, .12, .37, 1.18);
+    addBox(car, 'vehicle rear glass', carGlassMat, -1.08, 1.43, 0, .12, .34, 1.12);
+    addBox(car, 'vehicle front bumper', poleMat, 1.82, .59, 0, .16, .18, 1.48);
+    addBox(car, 'vehicle rear bumper', poleMat, -1.82, .59, 0, .16, .18, 1.48);
+    for (const side of [-1, 1]) {
+      for (const axle of [-1.18, 1.18]) addBox(car, 'vehicle wheel', tyreMat, axle, .38, side * .78, .62, .58, .2);
+      addBox(car, 'vehicle headlight', headlightMat, 1.79, .88, side * .49, .09, .2, .22);
+      addBox(car, 'vehicle tail light', tailLightMat, -1.8, .86, side * .49, .08, .2, .22);
+    }
+    const laneOffset = Math.min(roadWidth * .17, 4.0);
+    let x = roadX, z = roadZ, yaw = 0;
+    if (axis === 'x') {
+      z += direction * laneOffset;
+      x += (rand() - .5) * 22;
+      yaw = direction > 0 ? 0 : Math.PI;
+    } else {
+      x -= direction * laneOffset;
+      z += (rand() - .5) * 22;
+      yaw = direction > 0 ? -Math.PI / 2 : Math.PI / 2;
+    }
+    car.position.set(x, 0, z);
+    car.rotation.y = yaw;
+    parent.add(car);
+    const record = { group: car, ownerKey, axis, direction, x, z, yaw, maxSpeed: 7 + rand() * 4, speed: 0, laneOffset };
+    trafficCars.push(record);
+    return record;
   }
 
   function addStreetLight(parent, x, z, alongX, rand) {
@@ -357,8 +398,12 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     if (hasSouthRoad) addRoadSegment(group, 'x', midX, z0 + CHUNK_Z, CHUNK_X, southWidth, rand, southWidth >= 24 ? 'boulevard' : style);
     if (hasWestRoad) addRoadSegment(group, 'z', x0, midZ, CHUNK_Z, westWidth, rand, westWidth >= 24 ? 'boulevard' : style);
     if (hasEastRoad) addRoadSegment(group, 'z', x0 + CHUNK_X, midZ, CHUNK_Z, eastWidth, rand, eastWidth >= 24 ? 'boulevard' : style);
+    // One traffic vehicle per continuous road axis in this chunk; distant chunks use the same low-poly cars.
 
     // Occasional diagonal cut-throughs connect two boundary streets and break up the rigid grid.
+    if (hasNorthRoad) spawnTrafficCar(group, key, 'x', rand() > .5 ? 1 : -1, midX, z0, northWidth, rand);
+    if (hasWestRoad) spawnTrafficCar(group, key, 'z', rand() > .5 ? 1 : -1, x0, midZ, westWidth, rand);
+
     const diagonalStreet = hasNorthRoad && hasWestRoad && positiveMod(cx * 3 + cz * 5, 5) === 0;
     if (diagonalStreet) {
       const diagonalLength = Math.sqrt(64 * 64 + 64 * 64);
@@ -398,10 +443,12 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
       addCrosswalk(group, ix, iz, Math.max(northWidth, southWidth), Math.max(westWidth, eastWidth));
       const offsetX = westWidth / 2 + 2.5;
       const offsetZ = northWidth / 2 + 2.5;
-      addTrafficSignal(group, ix - offsetX, iz - offsetZ, 0, rand);
-      addTrafficSignal(group, ix + offsetX, iz + offsetZ, Math.PI, rand);
-      addTrafficSignal(group, ix + offsetX, iz - offsetZ, Math.PI / 2, rand);
-      addTrafficSignal(group, ix - offsetX, iz + offsetZ, -Math.PI / 2, rand);
+      const controller = { x: ix, z: iz, ownerKey: key, phaseOffset: 0 };
+      trafficControllers.set(ix + ',' + iz, controller);
+      addTrafficSignal(group, ix - offsetX, iz - offsetZ, 0, rand, controller, 'x');
+      addTrafficSignal(group, ix + offsetX, iz + offsetZ, Math.PI, rand, controller, 'x');
+      addTrafficSignal(group, ix + offsetX, iz - offsetZ, Math.PI / 2, rand, controller, 'z');
+      addTrafficSignal(group, ix - offsetX, iz + offsetZ, -Math.PI / 2, rand, controller, 'z');
       // Corner islands on some major junctions.
       if (northWidth >= 24 && westWidth >= 24) {
         addPlane(group, grassMats[1], ix + 10, iz + 10, 4.2, 4.2, .018);
@@ -558,13 +605,16 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
 
   let lastChunkX = NaN, lastChunkZ = NaN, lastRadius = -1;
   function updateStreaming(force = false) {
-    const radius = Math.min(3, BASE_LOAD_RADIUS + Math.floor(Math.max(0, camera.position.y - 25) / 65));
+    const radius = Math.min(4, BASE_LOAD_RADIUS + Math.floor(Math.max(0, camera.position.y - 25) / 65));
     const centerX = Math.floor(camera.position.x / CHUNK_X);
     const centerZ = Math.floor(camera.position.z / CHUNK_Z);
     if (!force && centerX === lastChunkX && centerZ === lastChunkZ && radius === lastRadius) return;
     lastChunkX = centerX;
     lastChunkZ = centerZ;
     lastRadius = radius;
+    const fogFar = 360 + camera.position.y * 2.0;
+    scene.fog.near = 180 + camera.position.y * .7;
+    scene.fog.far = fogFar;
     const wanted = new Set();
     for (let dz = -radius; dz <= radius; dz++) {
       for (let dx = -radius; dx <= radius; dx++) {
@@ -586,26 +636,75 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
         if (obj.userData.trafficSignalBulb) obj.material?.dispose();
       });
       for (let i = trafficSignals.length - 1; i >= 0; i--) {
-        if (trafficSignals[i].bulbs.some(item => removedObjects.has(item.bulb))) trafficSignals.splice(i, 1);
+        if (trafficSignals[i].controller.ownerKey === key || trafficSignals[i].bulbs.some(item => removedObjects.has(item.bulb))) trafficSignals.splice(i, 1);
+      }
+      for (const [controllerKey, controller] of trafficControllers) {
+        if (controller.ownerKey === key) trafficControllers.delete(controllerKey);
+      }
+      for (let i = trafficCars.length - 1; i >= 0; i--) {
+        if (trafficCars[i].ownerKey === key) trafficCars.splice(i, 1);
       }
       chunks.delete(key);
     }
   }
   updateStreaming(true);
 
-  // Functional signal phases: conflicting approaches alternate between green directions.
+  // Each junction has one shared 20-second phase: X traffic then Z traffic.
   let signalElapsed = 0;
+  function signalPhase(controller) {
+    return (signalElapsed + controller.phaseOffset) % 20;
+  }
+  function axisHasGreen(controller, axis) {
+    const phase = signalPhase(controller);
+    return axis === 'x' ? phase < 8 : phase >= 10 && phase < 18;
+  }
   function updateTrafficSignals(dt) {
     signalElapsed += dt;
     for (const signal of trafficSignals) {
-      const phase = (signalElapsed + signal.phaseOffset) % 16;
-      let active = phase < 7 ? 2 : phase < 8 ? 1 : phase < 15 ? 0 : 1;
+      const phase = signalPhase(signal.controller);
+      let active;
+      if (signal.axis === 'x') active = phase < 8 ? 2 : phase < 10 ? 1 : 0;
+      else active = phase < 10 ? 0 : phase < 18 ? 2 : 1;
       signal.bulbs.forEach((item, i) => {
         const on = i === active;
         item.material.emissive.setHex(on ? [0xff1818, 0xffad18, 0x20ff62][i] : 0x000000);
         item.material.emissiveIntensity = on ? 2.4 : 0;
         item.bulb.scale.setScalar(on ? 1.18 : 1);
       });
+    }
+  }
+
+  function updateTrafficAI(dt) {
+    const controllers = Array.from(trafficControllers.values());
+    for (const car of trafficCars) {
+      const distanceToCamera = Math.hypot(car.x - camera.position.x, car.z - camera.position.z);
+      car.group.visible = distanceToCamera < 430;
+      if (!car.group.visible) continue;
+      let desiredSpeed = car.maxSpeed;
+      // Basic car-following: don't drive into another vehicle in the same lane.
+      for (const other of trafficCars) {
+        if (other === car || other.axis !== car.axis || other.direction !== car.direction) continue;
+        const lateral = car.axis === 'x' ? Math.abs(other.z - car.z) : Math.abs(other.x - car.x);
+        if (lateral > 2.2) continue;
+        const ahead = car.axis === 'x' ? (other.x - car.x) * car.direction : (other.z - car.z) * car.direction;
+        if (ahead > .1 && ahead < 9) desiredSpeed = Math.min(desiredSpeed, Math.max(0, (ahead - 3.8) * 1.3));
+      }
+      // Brake before a junction whenever the car's shared traffic signal is not green.
+      let nearestStop = Infinity;
+      for (const controller of controllers) {
+        const lateral = car.axis === 'x' ? Math.abs(controller.z - car.z) : Math.abs(controller.x - car.x);
+        if (lateral > 13) continue;
+        const ahead = car.axis === 'x' ? (controller.x - car.x) * car.direction : (controller.z - car.z) * car.direction;
+        if (ahead > .1 && ahead < 17 && ahead < nearestStop) {
+          nearestStop = ahead;
+          if (!axisHasGreen(controller, car.axis)) desiredSpeed = Math.min(desiredSpeed, Math.max(0, (ahead - 5.5) * 1.5));
+        }
+      }
+      car.speed += (desiredSpeed - car.speed) * Math.min(1, dt * (desiredSpeed < car.speed ? 4.8 : 1.5));
+      const step = car.speed * dt * car.direction;
+      if (car.axis === 'x') car.x += step;
+      else car.z += step;
+      car.group.position.set(car.x, 0, car.z);
     }
   }
 
@@ -678,6 +777,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
       camera.position.y = THREE.MathUtils.clamp(camera.position.y, 1.4, 220);
       updateStreaming();
       updateTrafficSignals(dt);
+      updateTrafficAI(dt);
     } else {
       updateTrafficSignals(dt);
     }
