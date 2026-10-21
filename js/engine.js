@@ -554,7 +554,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
 
   let lastChunkX = NaN, lastChunkZ = NaN, lastRadius = -1;
   function updateStreaming(force = false) {
-    const radius = Math.min(6, BASE_LOAD_RADIUS + Math.floor(Math.max(0, camera.position.y - 25) / 65));
+    const radius = Math.min(5, BASE_LOAD_RADIUS + Math.floor(Math.max(0, camera.position.y - 25) / 65));
     const centerX = Math.floor(camera.position.x / CHUNK_X);
     const centerZ = Math.floor(camera.position.z / CHUNK_Z);
     if (!force && centerX === lastChunkX && centerZ === lastChunkZ && radius === lastRadius) return;
