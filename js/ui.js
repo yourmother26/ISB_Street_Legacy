@@ -111,4 +111,7 @@ export function initUI({ engine, intro, menu, gameView }) {
     button.addEventListener('click', () => $(button.dataset.close)?.classList.add('hidden'));
   });
   $('quality')?.addEventListener('change', (event) => engine.setQuality(event.target.value));
+  $('vehicle-enter')?.addEventListener('click', () => engine.enterVehicle());
+  $('vehicle-exit')?.addEventListener('click', () => engine.exitVehicle());
+  $('vehicle-camera-toggle')?.addEventListener('click', () => engine.toggleVehicleCamera());
 }
