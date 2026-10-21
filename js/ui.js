@@ -79,6 +79,32 @@ export function initUI({ engine, intro, menu, gameView }) {
     if (joystickPointer === event.pointerId) resetJoystick();
   });
   joystickZone?.addEventListener('lostpointercapture', resetJoystick);
+
+  // Hold-to-fly buttons make vertical free-camera movement usable on touchscreens.
+  const flyUp = $('fly-up');
+  const flyDown = $('fly-down');
+  let verticalPointer = null;
+  function stopVertical(event) {
+    if (verticalPointer !== null && (!event || event.pointerId === verticalPointer)) {
+      verticalPointer = null;
+      engine.setVerticalInput(0);
+    }
+  }
+  function bindFlightButton(button, direction) {
+    button?.addEventListener('pointerdown', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      verticalPointer = event.pointerId;
+      try { button.setPointerCapture(event.pointerId); } catch (_) {}
+      engine.setVerticalInput(direction);
+    });
+    button?.addEventListener('pointerup', event => { event.stopPropagation(); stopVertical(event); });
+    button?.addEventListener('pointercancel', stopVertical);
+    button?.addEventListener('lostpointercapture', () => stopVertical());
+    button?.addEventListener('contextmenu', event => event.preventDefault());
+  }
+  bindFlightButton(flyUp, 1);
+  bindFlightButton(flyDown, -1);
   $('open-settings')?.addEventListener('click', () => settings.classList.remove('hidden'));
   $('open-socials')?.addEventListener('click', () => socials.classList.remove('hidden'));
   document.querySelectorAll('[data-close]').forEach(button => {
