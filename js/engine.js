@@ -98,6 +98,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
         root.position.y -= bounds.min.y;
         root.traverse(obj => {
           if (obj.isMesh) {
+            obj.userData.sharedModelGeometry = true;
             obj.castShadow = false;
             obj.receiveShadow = true;
             if (obj.material) {
