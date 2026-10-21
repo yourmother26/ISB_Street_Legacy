@@ -29,7 +29,6 @@ async function start() {
     const engine = await initEngine($('game-canvas'), {
       onStats: ({ fps, frameMs, renderer }) => {
         $('fps-readout').textContent = `FPS ${fps}`;
-        $('menu-performance').textContent = `FPS ${fps}`;
         $('renderer-readout').textContent = `${frameMs} ms · ${renderer}`;
       }
     });
