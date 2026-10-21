@@ -187,6 +187,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     for (let i = 0; i < 3; i++) {
       const geo = new THREE.SphereGeometry(.13, 8, 6);
       const bulb = new THREE.Mesh(geo, bulbMats[i]);
+      bulb.userData.trafficSignalBulb = true;
       bulb.position.set(headX, ys[i], headZ + .2);
       parent.add(bulb);
       bulbs.push({ bulb, material: bulbMats[i] });
@@ -545,11 +546,16 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     for (const [key, chunk] of chunks) {
       if (wanted.has(key)) continue;
       scene.remove(chunk.group);
+      const removedObjects = new Set();
       chunk.group.traverse(obj => {
-        if (obj.isMesh && obj.geometry !== boxGeo && obj.geometry !== treeGeo && obj.geometry !== roofGeo && !obj.userData.sharedModelGeometry) {
-          obj.geometry?.dispose();
-        }
+        if (!obj.isMesh) return;
+        removedObjects.add(obj);
+        if (obj.geometry !== boxGeo && obj.geometry !== treeGeo && obj.geometry !== roofGeo && !obj.userData.sharedModelGeometry) obj.geometry?.dispose();
+        if (obj.userData.trafficSignalBulb) obj.material?.dispose();
       });
+      for (let i = trafficSignals.length - 1; i >= 0; i--) {
+        if (trafficSignals[i].bulbs.some(item => removedObjects.has(item.bulb))) trafficSignals.splice(i, 1);
+      }
       chunks.delete(key);
     }
   }
