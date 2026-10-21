@@ -105,14 +105,17 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
   let running = true;
 
   function resize() {
-    const w = Math.max(1, window.innerWidth);
-    const h = Math.max(1, window.innerHeight);
+    const viewport = window.visualViewport;
+    const w = Math.max(1, Math.round(viewport?.width || window.innerWidth));
+    const h = Math.max(1, Math.round(viewport?.height || window.innerHeight));
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
     renderer.setSize(w, h, false);
   }
   window.addEventListener('resize', resize, { passive: true });
+  window.addEventListener('orientationchange', resize, { passive: true });
+  window.visualViewport?.addEventListener('resize', resize, { passive: true });
 
   function animate(now) {
     if (!running) return;
@@ -141,11 +144,13 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     setQuality(level) {
       const ratio = level === 'high' ? 1.5 : level === 'low' ? 0.85 : 1.15;
       renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * ratio, 1.5));
-      renderer.setSize(window.innerWidth, window.innerHeight, false);
+      resize();
     },
     dispose() {
       running = false;
       window.removeEventListener('resize', resize);
+      window.removeEventListener('orientationchange', resize);
+      window.visualViewport?.removeEventListener('resize', resize);
       canvas.removeEventListener('pointerdown', onPointerDown);
       canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('pointerup', onPointerUp);
