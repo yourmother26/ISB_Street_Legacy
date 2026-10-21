@@ -129,9 +129,13 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     const size = template.userData.sourceSize;
     const scale = Math.min(targetW / size.x, targetD / size.z, maxH / size.y);
     model.scale.setScalar(scale);
-    model.position.set(x, 0, z);
-    model.rotation.y = yaw;
-    return model;
+    // Scale the GLB's pivot correction too, then rotate it around the lot centre.
+    model.position.multiplyScalar(scale);
+    const placement = new THREE.Group();
+    placement.position.set(x, 0, z);
+    placement.rotation.y = yaw;
+    placement.add(model);
+    return placement;
   }
 
   function addFallbackBuilding(parent, x, z, rand, w, d, h, isTower = false) {
