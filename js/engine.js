@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const ASSET_BASE = new URL('../New%20Folder%201/Models/GLB%20format/', import.meta.url).href;
 const CHUNK_X = 96;
 const CHUNK_Z = 96;
-const BASE_LOAD_RADIUS = 2;
+const BASE_LOAD_RADIUS = 3;
 const WORLD_LIMIT = 4900;
 
 export async function initEngine(canvas, { onStats = () => {} } = {}) {
@@ -41,6 +41,8 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
   const roofMats = [0x873f35, 0x4b5056, 0x8a6c47, 0x315c68].map(color => new THREE.MeshStandardMaterial({ color, roughness: 1 }));
   const windowMat = new THREE.MeshStandardMaterial({ color: 0x8fd8f2, emissive: 0x17394b, roughness: .35, metalness: .1 });
   const doorMat = new THREE.MeshStandardMaterial({ color: 0x593b2a, roughness: .9 });
+  const towerGlassMat = new THREE.MeshStandardMaterial({ color: 0x67cbe8, roughness: .16, metalness: .18, transparent: true, opacity: .72, depthWrite: false });
+  const towerFrameMat = new THREE.MeshStandardMaterial({ color: 0x303c46, roughness: .38, metalness: .65 });
   const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5b422b, roughness: 1 });
   const leafMat = new THREE.MeshStandardMaterial({ color: 0x3d7946, roughness: 1 });
   const poleMat = new THREE.MeshStandardMaterial({ color: 0x343c44, roughness: .8, metalness: .25 });
@@ -138,10 +140,32 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     return placement;
   }
 
+  function addTowerGlassEntrance(parent, x, z, w, d, yaw = 0) {
+    const entrance = new THREE.Group();
+    entrance.name = 'skyscraper glass entrance';
+    entrance.position.set(x, 0, z);
+    entrance.rotation.y = yaw;
+    const front = d / 2 + .09;
+    const doorW = Math.min(3.8, Math.max(2.8, w * .27));
+    const doorH = 3.5;
+    const frame = .13;
+    addBox(entrance, 'glass lobby left frame', towerFrameMat, -doorW / 2 - frame / 2, doorH / 2, front, frame, doorH + .24, .18);
+    addBox(entrance, 'glass lobby right frame', towerFrameMat, doorW / 2 + frame / 2, doorH / 2, front, frame, doorH + .24, .18);
+    addBox(entrance, 'glass lobby top frame', towerFrameMat, 0, doorH + .12, front, doorW + frame * 2, frame, .18);
+    addBox(entrance, 'left glass entrance door', towerGlassMat, -doorW * .255, doorH / 2, front + .015, doorW * .49, doorH, .07);
+    addBox(entrance, 'right glass entrance door', towerGlassMat, doorW * .255, doorH / 2, front + .02, doorW * .49, doorH, .07);
+    addBox(entrance, 'glass door centre stile', towerFrameMat, 0, doorH / 2, front + .065, .075, doorH, .08);
+    addBox(entrance, 'glass lobby transom', towerGlassMat, 0, doorH + .48, front + .015, doorW, .55, .07);
+    addBox(entrance, 'glass lobby transom frame', towerFrameMat, 0, doorH + .77, front, doorW + frame * 2, .12, .18);
+    parent.add(entrance);
+    return entrance;
+  }
+
   function addFallbackBuilding(parent, x, z, rand, w, d, h, isTower = false) {
     const mat = isTower ? concreteMats[Math.floor(rand() * concreteMats.length)] : houseMats[Math.floor(rand() * houseMats.length)];
     addBox(parent, 'fallback building', mat, x, h / 2, z, w, h, d);
-    addBox(parent, 'fallback entrance', doorMat, x, .95, z + d / 2 + .05, .8, 1.9, .1);
+    if (isTower) addTowerGlassEntrance(parent, x, z, w, d);
+    else addBox(parent, 'fallback entrance', doorMat, x, .95, z + d / 2 + .05, .8, 1.9, .1);
     const floors = Math.max(1, Math.floor(h / 3));
     for (let f = 0; f < Math.min(floors, 9); f++) {
       for (let col = -1; col <= 1; col++) {
@@ -404,7 +428,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     const suburban = !downtown && !commercial && !industrial;
     const district = downtown ? 'downtown' : commercial ? 'commercial' : industrial ? 'industrial' : 'suburban';
     const lotSize = downtown ? 20 : industrial ? 21 : 19;
-    const centers = [26, 48, 70];
+    const centers = [24, 40, 56, 72];
     const lotJobs = [];
     const usedBuildingNames = new Set();
     const chooseUnused = (pool, seed) => {
@@ -416,17 +440,18 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
       return pool[start];
     };
     let serial = positiveMod(cx * 11 + cz * 17, regularNames.length);
-    for (let rz = 0; rz < 3; rz++) {
-      for (let rx = 0; rx < 3; rx++) {
-        if (!nearCenter && positiveMod(rx + rz + cx + cz, 2) === 0) continue;
+    for (let rz = 0; rz < 4; rz++) {
+      for (let rx = 0; rx < 4; rx++) {
+        // Fill every lot in the nearby city; keep most outer-ring lots for lighter mobile rendering.
+        if (!nearCenter && positiveMod(rx * 3 + rz * 5 + cx + cz, 4) === 0) continue;
         const lotRand = seededRandom(cx * 7 + rx, cz * 11 + rz, 301);
         const roll = lotRand();
         if (suburban && roll < .18) continue;
         if (commercial && roll < .1) continue;
         if (downtown && roll < .05) continue;
         if (industrial && roll < .36) continue;
-        const x = x0 + centers[rx] + (lotRand() - .5) * 5.5;
-        const z = z0 + centers[rz] + (lotRand() - .5) * 5.5;
+        const x = x0 + centers[rx] + (lotRand() - .5) * 2.2;
+        const z = z0 + centers[rz] + (lotRand() - .5) * 2.2;
         let name;
         let tower = false;
         if (downtown && lotRand() < .62) {
@@ -438,8 +463,8 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
           name = chooseUnused(regularNames, serial + rx * 3 + rz * 5);
         }
         serial += 3 + Math.floor(lotRand() * 4);
-        const mainW = tower ? 15 + lotRand() * 6 : industrial ? 13 + lotRand() * 5 : commercial ? 9 + lotRand() * 6 : 8 + lotRand() * 5;
-        const mainD = tower ? 15 + lotRand() * 6 : industrial ? 13 + lotRand() * 5 : commercial ? 9 + lotRand() * 6 : 8 + lotRand() * 5;
+        const mainW = tower ? 11 + lotRand() * 3 : industrial ? 9 + lotRand() * 4 : commercial ? 7.5 + lotRand() * 3.5 : 6.5 + lotRand() * 3.5;
+        const mainD = tower ? 11 + lotRand() * 3 : industrial ? 9 + lotRand() * 4 : commercial ? 7.5 + lotRand() * 3.5 : 6.5 + lotRand() * 3.5;
         const mainH = tower ? 105 + lotRand() * 85 : commercial ? 24 + lotRand() * 25 : suburban ? 8 + lotRand() * 11 : 25 + lotRand() * 15;
         lotJobs.push({ x, z, name, tower, mainW, mainD, mainH, yaw: Math.floor(lotRand() * 4) * Math.PI / 2, lotRand, rx, rz });
       }
@@ -448,8 +473,8 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     // Vary property boundaries and setbacks so yards don't all share the same silhouette.
     for (const job of lotJobs) {
       if (job.tower) continue;
-      const propertySize = Math.min(21, Math.max(18, Math.max(job.mainW, job.mainD) + 6.5) + job.lotRand() * 1.5);
-      if (nearCenter && (suburban || job.lotRand() > .4)) addProperty(group, job.x, job.z, propertySize, job.lotRand, district);
+      const propertySize = Math.min(16, Math.max(14, Math.max(job.mainW, job.mainD) + 3.5) + job.lotRand() * .8);
+      if (nearCenter && (suburban || job.lotRand() > .4) && job.rx > 0 && job.rx < 3 && job.rz > 0 && job.rz < 3) addProperty(group, job.x, job.z, propertySize, job.lotRand, district);
       // Secondary buildings sit beside or behind the main building, rather than diagonally overlapping it.
       const annexOnX = job.lotRand() > .5;
       const annexSign = job.lotRand() > .5 ? 1 : -1;
@@ -516,6 +541,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
         const model = fitModel(template, job.x, job.z, job.w, job.d, job.h, job.yaw);
         model.name = job.name;
         group.add(model);
+        if (job.tower) addTowerGlassEntrance(group, job.x, job.z, job.w, job.d, job.yaw);
       } catch (error) {
         console.warn('[ISB Street Legacy] Could not load ' + job.name, error);
         if (chunks.get(key) !== chunk) return;
@@ -528,7 +554,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
 
   let lastChunkX = NaN, lastChunkZ = NaN, lastRadius = -1;
   function updateStreaming(force = false) {
-    const radius = Math.min(4, BASE_LOAD_RADIUS + Math.floor(Math.max(0, camera.position.y - 25) / 65));
+    const radius = Math.min(5, BASE_LOAD_RADIUS + Math.floor(Math.max(0, camera.position.y - 25) / 65));
     const centerX = Math.floor(camera.position.x / CHUNK_X);
     const centerZ = Math.floor(camera.position.z / CHUNK_Z);
     if (!force && centerX === lastChunkX && centerZ === lastChunkZ && radius === lastRadius) return;
@@ -536,7 +562,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     lastChunkZ = centerZ;
     lastRadius = radius;
     // Fog end tracks the loaded chunk ring so the world fades out before the streaming edge.
-    const fogFar = radius * CHUNK_X + CHUNK_X * .55;
+    const fogFar = (radius * CHUNK_X + CHUNK_X * .55) * 1.2;
     scene.fog.near = fogFar * .44;
     scene.fog.far = fogFar;
     const wanted = new Set();
