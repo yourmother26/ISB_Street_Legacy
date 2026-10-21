@@ -8,6 +8,11 @@ export function initUI({ engine, intro, menu, gameView }) {
     menu.classList.remove('hidden');
   };
   const enterWorld = () => {
+    // Mobile browsers may only permit orientation locking after a user gesture.
+    try {
+      const lock = screen.orientation?.lock;
+      if (typeof lock === 'function') lock.call(screen.orientation, 'landscape').catch(() => {});
+    } catch (_) {}
     intro.classList.add('hidden');
     menu.classList.add('hidden');
     settings.classList.add('hidden');
