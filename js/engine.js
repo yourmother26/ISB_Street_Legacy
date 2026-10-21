@@ -436,17 +436,24 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     // Vary property boundaries and setbacks so yards don't all share the same silhouette.
     for (const job of lotJobs) {
       if (job.tower) continue;
-      const propertySize = (suburban ? 16 : 15) + job.lotRand() * 4;
+      const propertySize = Math.min(21, Math.max(18, Math.max(job.mainW, job.mainD) + 6.5) + job.lotRand() * 1.5);
       if (suburban || job.lotRand() > .4) addProperty(group, job.x, job.z, propertySize, job.lotRand, district);
-      // Main structure.
-      const secondaryOffsetX = (job.lotRand() - .5) * 5;
-      const secondaryOffsetZ = (job.lotRand() - .5) * 5;
-      const hasAnnex = job.lotRand() > (suburban ? .38 : .62);
+      // Secondary buildings sit beside or behind the main building, rather than diagonally overlapping it.
+      const annexOnX = job.lotRand() > .5;
+      const annexSign = job.lotRand() > .5 ? 1 : -1;
+      const hasAnnex = job.lotRand() > (suburban ? .28 : .58);
       job.annex = hasAnnex ? {
         name: chooseUnused(nearCenter ? regularNames : lowNames, serial + job.rx * 5 + job.rz * 7),
-        x: job.x + (job.mainW * .55) * (job.lotRand() > .5 ? 1 : -1) + secondaryOffsetX,
-        z: job.z + (job.mainD * .5) * (job.lotRand() > .5 ? 1 : -1) + secondaryOffsetZ,
-        w: 5 + job.lotRand() * 5, d: 5 + job.lotRand() * 5, h: 4 + job.lotRand() * 7,
+        x: job.x + (annexOnX ? annexSign * (job.mainW / 2 + 2.3) : (job.lotRand() - .5) * 2.2),
+        z: job.z + (!annexOnX ? annexSign * (job.mainD / 2 + 2.3) : (job.lotRand() - .5) * 2.2),
+        w: 4.2 + job.lotRand() * 2.1, d: 4.2 + job.lotRand() * 2.1, h: 4 + job.lotRand() * 6,
+        yaw: Math.floor(job.lotRand() * 4) * Math.PI / 2
+      } : null;
+      job.outbuilding = !job.tower && job.lotRand() > (suburban ? .55 : .82) ? {
+        name: chooseUnused(nearCenter ? regularNames : lowNames, serial + job.rx * 13 + job.rz * 11 + 7),
+        x: job.x + (annexOnX ? (job.lotRand() - .5) * 2.2 : -annexSign * (job.mainW / 2 + 2.0)),
+        z: job.z + (annexOnX ? -annexSign * (job.mainD / 2 + 2.0) : (job.lotRand() - .5) * 2.2),
+        w: 3.6 + job.lotRand() * 1.8, d: 3.6 + job.lotRand() * 1.8, h: 3.5 + job.lotRand() * 4.5,
         yaw: Math.floor(job.lotRand() * 4) * Math.PI / 2
       } : null;
     }
@@ -456,6 +463,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     for (const job of lotJobs) {
       modelJobs.push({ name: job.name, x: job.x, z: job.z, w: job.mainW, d: job.mainD, h: job.mainH, yaw: job.yaw, tower: job.tower });
       if (job.annex && !job.tower) modelJobs.push({ ...job.annex, tower: false });
+      if (job.outbuilding && !job.tower) modelJobs.push({ ...job.outbuilding, tower: false });
       // Small shop extensions and rooftop/canopy details are limited to relevant districts.
       if ((commercial || downtown) && !job.tower && job.lotRand() > .45) {
         const detailName = detailNames[positiveMod(job.rx * 5 + job.rz * 3 + cx - cz, detailNames.length)];
