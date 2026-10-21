@@ -174,7 +174,8 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
   };
   const onKeyUp = e => keys.delete(e.key.toLowerCase());
   const onPointerDown = e => {
-    if (paused || e.clientX < window.innerWidth * .38) return;
+    // The entire left control lane belongs to the on-screen joystick. Never turn it into camera-look input.
+    if (paused || e.clientX < window.innerWidth * .42) return;
     dragging = true;
     dragMode = 'look';
     lastX = e.clientX; lastY = e.clientY;
@@ -237,6 +238,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     const length = Math.hypot(forward, strafe);
     if (length > 1) { forward /= length; strafe /= length; }
     const speed = (keys.has('shift') ? 24 : 11) * dt;
+    // Joystick forward/back and strafe are relative to the camera's current horizontal facing direction.
     camera.position.x += (Math.sin(yaw) * forward + Math.cos(yaw) * strafe) * speed;
     camera.position.z += (-Math.cos(yaw) * forward + Math.sin(yaw) * strafe) * speed;
     camera.position.y = THREE.MathUtils.clamp(camera.position.y, 1.4, 30);
