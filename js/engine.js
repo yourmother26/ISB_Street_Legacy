@@ -226,7 +226,9 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
         addPlane(group, whitePaint, centerX, centerZ + width * .24, length, .11, .019);
       }
       // Kerbside street furniture stays on the pavement, never in traffic lanes.
-      for (const frac of [-.32, .30]) {
+      const lightCount = style === 'boulevard' ? 2 : (rand() > .42 ? 1 : 0);
+      for (let i = 0; i < lightCount; i++) {
+        const frac = -.34 + rand() * .68;
         const lx = centerX + frac * length;
         addStreetLight(group, lx, centerZ + width / 2 + 2.6, true, rand);
       }
@@ -248,7 +250,9 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
         addPlane(group, whitePaint, centerX - width * .24, centerZ, .11, length, .019);
         addPlane(group, whitePaint, centerX + width * .24, centerZ, .11, length, .019);
       }
-      for (const frac of [-.32, .30]) {
+      const lightCount = style === 'boulevard' ? 2 : (rand() > .42 ? 1 : 0);
+      for (let i = 0; i < lightCount; i++) {
+        const frac = -.34 + rand() * .68;
         const lz = centerZ + frac * length;
         addStreetLight(group, centerX + width / 2 + 2.6, lz, false, rand);
       }
@@ -407,6 +411,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     let serial = positiveMod(cx * 11 + cz * 17, regularNames.length);
     for (let rz = 0; rz < 3; rz++) {
       for (let rx = 0; rx < 3; rx++) {
+        if (!nearCenter && positiveMod(rx + rz + cx + cz, 2) === 0) continue;
         const lotRand = seededRandom(cx * 7 + rx, cz * 11 + rz, 301);
         const roll = lotRand();
         if (suburban && roll < .18) continue;
@@ -437,11 +442,11 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     for (const job of lotJobs) {
       if (job.tower) continue;
       const propertySize = Math.min(21, Math.max(18, Math.max(job.mainW, job.mainD) + 6.5) + job.lotRand() * 1.5);
-      if (suburban || job.lotRand() > .4) addProperty(group, job.x, job.z, propertySize, job.lotRand, district);
+      if (nearCenter && (suburban || job.lotRand() > .4)) addProperty(group, job.x, job.z, propertySize, job.lotRand, district);
       // Secondary buildings sit beside or behind the main building, rather than diagonally overlapping it.
       const annexOnX = job.lotRand() > .5;
       const annexSign = job.lotRand() > .5 ? 1 : -1;
-      const hasAnnex = job.lotRand() > (suburban ? .28 : .58);
+      const hasAnnex = nearCenter && job.lotRand() > (suburban ? .28 : .58);
       job.annex = hasAnnex ? {
         name: chooseUnused(nearCenter ? regularNames : lowNames, serial + job.rx * 5 + job.rz * 7),
         x: job.x + (annexOnX ? annexSign * (job.mainW / 2 + 2.3) : (job.lotRand() - .5) * 2.2),
@@ -449,7 +454,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
         w: 4.2 + job.lotRand() * 2.1, d: 4.2 + job.lotRand() * 2.1, h: 4 + job.lotRand() * 6,
         yaw: Math.floor(job.lotRand() * 4) * Math.PI / 2
       } : null;
-      job.outbuilding = !job.tower && job.lotRand() > (suburban ? .55 : .82) ? {
+      job.outbuilding = nearCenter && !job.tower && job.lotRand() > (suburban ? .55 : .82) ? {
         name: chooseUnused(nearCenter ? regularNames : lowNames, serial + job.rx * 13 + job.rz * 11 + 7),
         x: job.x + (annexOnX ? (job.lotRand() - .5) * 2.2 : -annexSign * (job.mainW / 2 + 2.0)),
         z: job.z + (annexOnX ? -annexSign * (job.mainD / 2 + 2.0) : (job.lotRand() - .5) * 2.2),
@@ -477,7 +482,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     }
 
     // More street trees and planters on residential blocks; landscaped medians on boulevards.
-    if (suburban || commercial) {
+    if (nearCenter && (suburban || commercial)) {
       for (let i = 0; i < 5; i++) {
         const tx = x0 + 12 + rand() * 72;
         const tz = z0 + 12 + rand() * 72;
