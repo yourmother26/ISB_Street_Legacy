@@ -42,3 +42,32 @@ body { min-width: 0; min-height: 100vh; min-height: 100dvh; }
   .menu-copy { left: 7vw; width: 86vw; }
   .menu h1 { font-size: clamp(3rem, 14vw, 5rem); }
 }
+
+
+/* Final compact landscape composition for real phone screens */
+@media (orientation: landscape) {
+  .menu-copy {
+    top: 50%;
+    left: max(6vw, env(safe-area-inset-left));
+    width: min(62vw, 560px);
+    max-height: calc(100dvh - 82px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    transform: translateY(-48%);
+  }
+  .menu h1 {
+    font-size: clamp(2.45rem, 10.5vh, 4.8rem);
+    line-height: .84;
+    margin: .35rem 0 .55rem;
+  }
+  .menu-description { margin: .5rem 0; }
+  .menu-actions { width: min(47vw, 330px); }
+  .menu-top { left: max(5vw, env(safe-area-inset-left)); right: max(5vw, env(safe-area-inset-right)); }
+  .menu-bottom { left: max(5vw, env(safe-area-inset-left)); right: max(5vw, env(safe-area-inset-right)); }
+}
+@media (orientation: landscape) and (max-height: 420px) {
+  .menu-copy { top: 49%; max-height: calc(100dvh - 62px); }
+  .menu h1 { font-size: clamp(2.15rem, 9.5vh, 3.4rem); }
+  .menu-description { font-size: .78rem; }
+  .menu-actions { margin-top: .45rem; gap: 4px; }
+  .primary-button, .secondary-button { min-height: 31px; font-size: .62rem; }
+  .eyebrow { font-size: .52rem; letter-spacing: .18em; }
+}
