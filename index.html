@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#090909">
   <meta name="description" content="ISB: Street Legacy — mobile open-world game prototype.">
   <title>ISB: Street Legacy</title>
-  <link rel="stylesheet" href="./css/main.css?v=6">
-  <link rel="stylesheet" href="./css/intro.css?v=6">
-  <link rel="stylesheet" href="./css/menu.css?v=6">
+  <link rel="stylesheet" href="./css/main.css?v=7">
+  <link rel="stylesheet" href="./css/intro.css?v=7">
+  <link rel="stylesheet" href="./css/menu.css?v=7">
   <!-- Local imports: place the official Three.js release files in vendor/three/ -->
   <script type="importmap">
   {
@@ -85,12 +85,15 @@
   <div id="game-view" class="game-view hidden">
     <canvas id="game-canvas"></canvas>
     <div class="game-hud">
-      <div class="hud-brand">ISB<span>:</span> STREET LEGACY <small>FOUNDATION TEST</small></div>
+      <div class="hud-brand">ISB<span>:</span> STREET LEGACY</div>
       <div class="hud-stats"><span id="fps-readout">FPS --</span><span id="renderer-readout">Starting renderer…</span></div>
-      <div class="hud-tip">FREE CAM · DRAG RIGHT TO LOOK · DRAG LEFT TO MOVE · WASD / ARROWS · SHIFT TO FLY FAST</div>
-      <button id="back-to-menu" class="hud-button">← MENU</button>
+      <div class="hud-tip">LEFT JOYSTICK · RIGHT SIDE TO LOOK</div>
+      <button id="pause-game" class="pause-button" aria-label="Pause game" title="Pause">Ⅱ</button>
     </div>
-    <div id="scene-label" class="scene-label">TEST ENVIRONMENT</div>
+    <div id="move-stick-zone" class="move-stick-zone" aria-label="Movement joystick"><div class="joystick-ring"><div id="move-stick-knob" class="joystick-knob"></div></div></div>
+    <section id="pause-panel" class="pause-panel hidden" aria-label="Paused game">
+      <div class="pause-card"><p class="pause-eyebrow">ISB: STREET LEGACY</p><h2>PAUSED</h2><button id="resume-game" class="primary-button">RESUME GAME</button><button id="exit-to-menu" class="secondary-button">EXIT TO MENU</button></div>
+    </section>
   </div>
 
   <div id="fatal-error" class="fatal-error hidden" role="alert">
@@ -113,6 +116,6 @@
       }
     }, 10000);
   </script>
-  <script type="module" src="./js/main.js?v=6"></script>
+  <script type="module" src="./js/main.js?v=7"></script>
 </body>
 </html>
