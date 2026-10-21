@@ -14,3 +14,15 @@
  .intro-caption { bottom: max(14%, calc(env(safe-area-inset-bottom) + 30px)); font-size: .5rem; }
  .skip-button { padding: 7px 10px; }
 }
+
+
+@media (orientation: landscape) {
+  .intro-lockup { transform-origin: center; }
+  .intro-logo { font-size: clamp(3.4rem, 23vh, 8rem); }
+  .intro-subtitle { font-size: clamp(.65rem, 2.8vh, 1.1rem); }
+}
+@media (orientation: landscape) and (max-height: 420px) {
+  .intro-logo { font-size: clamp(2.8rem, 20vh, 5.5rem); }
+  .intro-lockup { gap: 2px; }
+  .intro-caption { bottom: max(12%, calc(env(safe-area-inset-bottom) + 26px)); }
+}
