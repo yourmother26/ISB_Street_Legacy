@@ -87,10 +87,11 @@
     <div class="game-hud">
       <div class="hud-brand">ISB<span>:</span> STREET LEGACY</div>
       <div class="hud-stats"><span id="fps-readout">FPS --</span><span id="renderer-readout">Starting renderer…</span></div>
-      <div class="hud-tip">LEFT JOYSTICK · RIGHT SIDE TO LOOK</div>
+      <div class="hud-tip">LEFT JOYSTICK · RIGHT SIDE TO LOOK · UP/DOWN TO FLY</div>
       <button id="pause-game" class="pause-button" aria-label="Pause game" title="Pause">Ⅱ</button>
     </div>
     <div id="move-stick-zone" class="move-stick-zone" aria-label="Movement joystick"><div class="joystick-ring"><div id="move-stick-knob" class="joystick-knob"></div></div></div>
+    <div id="vertical-flight-controls" class="vertical-flight-controls" aria-label="Free camera flight controls"><button id="fly-up" type="button" aria-label="Fly up" title="Fly up">▲<span>UP</span></button><button id="fly-down" type="button" aria-label="Fly down" title="Fly down">▼<span>DOWN</span></button></div>
     <section id="pause-panel" class="pause-panel hidden" aria-label="Paused game">
       <div class="pause-card"><p class="pause-eyebrow">ISB: STREET LEGACY</p><h2>PAUSED</h2><button id="resume-game" class="primary-button">RESUME GAME</button><button id="exit-to-menu" class="secondary-button">EXIT TO MENU</button></div>
     </section>
@@ -116,6 +117,6 @@
       }
     }, 10000);
   </script>
-  <script type="module" src="./js/main.js?v=9"></script>
+  <script type="module" src="./js/main.js?v=10"></script>
 </body>
 </html>
