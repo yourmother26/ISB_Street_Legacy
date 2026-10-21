@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const ASSET_BASE = new URL('../New%20Folder%201/Models/GLB%20format/', import.meta.url).href;
 const CHUNK_X = 96;
 const CHUNK_Z = 96;
-const BASE_LOAD_RADIUS = 4;
+const BASE_LOAD_RADIUS = 3;
 const WORLD_LIMIT = 4900;
 
 export async function initEngine(canvas, { onStats = () => {} } = {}) {
@@ -554,7 +554,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
 
   let lastChunkX = NaN, lastChunkZ = NaN, lastRadius = -1;
   function updateStreaming(force = false) {
-    const radius = Math.min(7, BASE_LOAD_RADIUS + Math.floor(Math.max(0, camera.position.y - 25) / 65));
+    const radius = Math.min(6, BASE_LOAD_RADIUS + Math.floor(Math.max(0, camera.position.y - 25) / 65));
     const centerX = Math.floor(camera.position.x / CHUNK_X);
     const centerZ = Math.floor(camera.position.z / CHUNK_Z);
     if (!force && centerX === lastChunkX && centerZ === lastChunkZ && radius === lastRadius) return;
@@ -562,7 +562,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     lastChunkZ = centerZ;
     lastRadius = radius;
     // Fog end tracks the loaded chunk ring so the world fades out before the streaming edge.
-    const fogFar = (radius * CHUNK_X + CHUNK_X * .55) * 1.45;
+    const fogFar = (radius * CHUNK_X + CHUNK_X * .55) * 1.35;
     scene.fog.near = fogFar * .44;
     scene.fog.far = fogFar;
     const wanted = new Set();
