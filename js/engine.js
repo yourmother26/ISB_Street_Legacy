@@ -16,7 +16,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xa8cce8);
-  scene.fog = new THREE.Fog(0xa8cce8, 180, 360);
+  scene.fog = new THREE.Fog(0xa8cce8, 110, 245);
   const camera = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 1800);
   camera.position.set(0, 2.2, 14);
 
@@ -612,8 +612,9 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     lastChunkX = centerX;
     lastChunkZ = centerZ;
     lastRadius = radius;
-    const fogFar = 360 + camera.position.y * 2.0;
-    scene.fog.near = 180 + camera.position.y * .7;
+    // Fog end tracks the loaded chunk ring so the world fades out before the streaming edge.
+    const fogFar = radius * CHUNK_X + CHUNK_X * .55;
+    scene.fog.near = fogFar * .44;
     scene.fog.far = fogFar;
     const wanted = new Set();
     for (let dz = -radius; dz <= radius; dz++) {
