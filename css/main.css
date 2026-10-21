@@ -136,3 +136,23 @@ body { min-width: 0; min-height: 100vh; min-height: 100dvh; }
 .vertical-flight-controls button span { font-size:.52rem; letter-spacing:.12em; color:#9dd6ff; }
 .vertical-flight-controls button:active { background:#1764a0ee; transform:scale(.96); }
 @media (orientation:landscape) and (max-height:520px) { .vertical-flight-controls { right:max(14px,env(safe-area-inset-right)); bottom:max(16px,env(safe-area-inset-bottom)); gap:8px; } .vertical-flight-controls button { width:clamp(48px,10vh,60px); height:clamp(48px,10vh,60px); border-radius:12px; } }
+
+
+/* Player vehicle controls: compact blue glass buttons, independent of flight controls. */
+.vehicle-enter-control, .vehicle-driving-controls {
+  position:absolute; z-index:9; right:max(18px,env(safe-area-inset-right)); bottom:max(25px,env(safe-area-inset-bottom));
+  display:flex; align-items:center; justify-content:center; gap:8px; pointer-events:auto;
+}
+.vehicle-enter-control button, .vehicle-driving-controls button {
+  min-height:46px; padding:0 15px; border:1px solid #70baffc9; border-radius:12px; color:#fff;
+  background:linear-gradient(145deg,#102b45f2,#07111df2); box-shadow:inset 0 0 15px #168fff20,0 4px 16px #0008;
+  font-size:.7rem; font-weight:850; letter-spacing:.06em; touch-action:manipulation;
+}
+.vehicle-enter-control button:active, .vehicle-driving-controls button:active { background:#1764a0ee; transform:scale(.97); }
+.vehicle-driving-controls { flex-wrap:wrap; max-width:min(62vw,420px); justify-content:flex-end; }
+.vehicle-speed-readout { padding:10px 12px; border:1px solid #70baff85; border-radius:10px; background:#06101cdd; color:#a8d8ff; font-size:.75rem; font-weight:900; letter-spacing:.08em; font-variant-numeric:tabular-nums; }
+@media (orientation:landscape) and (max-height:520px) {
+  .vehicle-enter-control, .vehicle-driving-controls { right:max(14px,env(safe-area-inset-right)); bottom:max(16px,env(safe-area-inset-bottom)); gap:6px; }
+  .vehicle-enter-control button, .vehicle-driving-controls button { min-height:38px; padding:0 10px; font-size:.6rem; }
+  .vehicle-speed-readout { padding:8px; font-size:.65rem; }
+}
