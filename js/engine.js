@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const ASSET_BASE = new URL('../New%20Folder%201/Models/GLB%20format/', import.meta.url).href;
+const CAR_MODEL_URL = 'https://raw.githubusercontent.com/JaronKBragg7337/spectral-gt-rs/34499c501908818a2b08e589a7aecf963343cee7/spectral_gt_rs_game_ready.glb';
 const CHUNK_X = 96;
 const CHUNK_Z = 96;
 const BASE_LOAD_RADIUS = 2;
@@ -621,10 +622,99 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     }
   }
 
+
+  // Player-owned Spectral GT RS, loaded asynchronously from its public-domain GLB.
+  const vehicleRoot = new THREE.Group();
+  vehicleRoot.name = 'player-spectral-gt-rs';
+  vehicleRoot.position.set(0, 0.01, 10);
+  vehicleRoot.rotation.y = Math.PI / 2;
+  vehicleRoot.visible = false;
+  scene.add(vehicleRoot);
+  let vehicleReady = false, vehicleFailed = false, inVehicle = false;
+  let vehicleSpeed = 0, vehicleSteering = 0, vehicleYaw = Math.PI / 2;
+  let vehicleCameraMode = 'cockpit', steeringControl = null, steeringBaseX = 0;
+
+  function canEnterVehicle() {
+    return vehicleReady && !inVehicle && Math.hypot(camera.position.x - vehicleRoot.position.x, camera.position.z - vehicleRoot.position.z) < 8;
+  }
+  function updateVehicleUI() {
+    const enter = document.getElementById('vehicle-enter-control');
+    const controls = document.getElementById('vehicle-driving-controls');
+    const flight = document.getElementById('vertical-flight-controls');
+    const speed = document.getElementById('vehicle-speed-readout');
+    const cameraButton = document.getElementById('vehicle-camera-toggle');
+    enter?.classList.toggle('hidden', !canEnterVehicle());
+    controls?.classList.toggle('hidden', !inVehicle);
+    flight?.classList.toggle('hidden', inVehicle);
+    if (speed) speed.textContent = Math.round(Math.abs(vehicleSpeed) * 3.6) + ' KM/H';
+    if (cameraButton) cameraButton.textContent = vehicleCameraMode === 'cockpit' ? 'CHASE CAMERA' : 'COCKPIT CAMERA';
+  }
+  function positionVehicleCamera() {
+    if (!inVehicle || !vehicleReady) return;
+    vehicleRoot.updateMatrixWorld(true);
+    if (vehicleCameraMode === 'cockpit') {
+      camera.position.copy(vehicleRoot.localToWorld(new THREE.Vector3(-0.12, 1.36, 0.43)));
+      yaw = vehicleYaw - Math.PI / 2;
+      pitch = -0.035;
+      const dir = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
+      camera.lookAt(camera.position.clone().add(dir));
+    } else {
+      camera.position.copy(vehicleRoot.localToWorld(new THREE.Vector3(-6.3, 2.7, 0.35)));
+      camera.lookAt(vehicleRoot.localToWorld(new THREE.Vector3(0, 0.95, 0)));
+    }
+  }
+  function enterVehicle() {
+    if (!canEnterVehicle()) return false;
+    inVehicle = true; vehicleSpeed = 0; vehicleSteering = 0; vehicleCameraMode = 'cockpit';
+    moveX = 0; moveY = 0; verticalInput = 0; keys.clear();
+    yaw = vehicleYaw - Math.PI / 2; pitch = -0.035;
+    positionVehicleCamera(); updateVehicleUI(); return true;
+  }
+  function exitVehicle() {
+    if (!inVehicle) return false;
+    inVehicle = false; vehicleSpeed = 0; vehicleSteering = 0;
+    moveX = 0; moveY = 0; verticalInput = 0;
+    vehicleRoot.updateMatrixWorld(true);
+    camera.position.copy(vehicleRoot.localToWorld(new THREE.Vector3(-2.0, 1.65, 1.85)));
+    yaw = vehicleYaw - Math.PI / 2; pitch = -0.05; keys.clear(); updateVehicleUI(); return true;
+  }
+  function toggleVehicleCamera() {
+    if (!inVehicle) return false;
+    vehicleCameraMode = vehicleCameraMode === 'cockpit' ? 'chase' : 'cockpit';
+    positionVehicleCamera(); updateVehicleUI(); return true;
+  }
+  async function loadPlayerVehicle() {
+    try {
+      const gltf = await new GLTFLoader().loadAsync(CAR_MODEL_URL);
+      const car = gltf.scene;
+      car.name = 'spectral-gt-rs-model';
+      car.traverse(object => {
+        if (!object.isMesh) return;
+        object.castShadow = false; object.receiveShadow = false;
+        const materials = object.material ? (Array.isArray(object.material) ? object.material : [object.material]) : [];
+        for (const material of materials) {
+          if (material.map) material.map.colorSpace = THREE.SRGBColorSpace;
+          material.needsUpdate = true;
+        }
+      });
+      vehicleRoot.add(car);
+      steeringControl = car.getObjectByName('STEERING_INPUT_CTRL');
+      if (steeringControl) steeringBaseX = steeringControl.rotation.x;
+      vehicleRoot.visible = true; vehicleReady = true; updateVehicleUI();
+    } catch (error) {
+      vehicleFailed = true;
+      console.warn('[ISB Street Legacy] Spectral GT RS could not load from its public GLB source.', error);
+      updateVehicleUI();
+    }
+  }
+
   let yaw = 0, pitch = -.06, dragging = false, lastX = 0, lastY = 0;
   let moveX = 0, moveY = 0, paused = false, verticalInput = 0;
   const keys = new Set();
   const onKeyDown = e => {
+    if (e.key.toLowerCase() === 'e' && vehicleReady && (inVehicle || canEnterVehicle())) {
+      e.preventDefault(); if (inVehicle) exitVehicle(); else enterVehicle(); return;
+    }
     if (['w','a','s','d','ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' ','Shift','Control','q','e'].includes(e.key)) {
       if (e.key === ' ' || e.key.startsWith('Arrow')) e.preventDefault();
       keys.add(e.key.toLowerCase());
@@ -637,13 +727,13 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     canvas.setPointerCapture?.(e.pointerId);
   };
   const onPointerMove = e => {
-    if (!dragging || paused) return;
+    if (!dragging || paused || inVehicle) return;
     yaw -= (e.clientX - lastX) * .0042;
     pitch = THREE.MathUtils.clamp(pitch - (e.clientY - lastY) * .0032, -1.45, 1.35);
     lastX = e.clientX; lastY = e.clientY;
   };
   const onPointerUp = () => { dragging = false; };
-  const onWheel = e => { camera.position.y = THREE.MathUtils.clamp(camera.position.y + e.deltaY * .035, 1.4, 220); updateStreaming(); };
+  const onWheel = e => { if (inVehicle) return; camera.position.y = THREE.MathUtils.clamp(camera.position.y + e.deltaY * .035, 1.4, 220); updateStreaming(); };
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointermove', onPointerMove);
   canvas.addEventListener('pointerup', onPointerUp);
@@ -653,6 +743,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
   window.addEventListener('keyup', onKeyUp);
   const onBlur = () => { keys.clear(); moveX = 0; moveY = 0; verticalInput = 0; dragging = false; };
   window.addEventListener('blur', onBlur);
+  loadPlayerVehicle();
 
   let qualityPixelRatio = 0.7;
   let lastTime = performance.now(), sampleStart = lastTime, frames = 0, running = true;
@@ -682,26 +773,43 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
       let strafe = (keys.has('d') || keys.has('arrowright') ? 1 : 0) - (keys.has('a') || keys.has('arrowleft') ? 1 : 0) + moveX;
       const length = Math.hypot(forward, strafe);
       if (length > 1) { forward /= length; strafe /= length; }
-      const speed = (keys.has('shift') ? 30 : 13) * dt;
-      camera.position.x = THREE.MathUtils.clamp(camera.position.x + (Math.sin(yaw) * forward + Math.cos(yaw) * strafe) * speed, -WORLD_LIMIT, WORLD_LIMIT);
-      camera.position.z = THREE.MathUtils.clamp(camera.position.z + (-Math.cos(yaw) * forward + Math.sin(yaw) * strafe) * speed, -WORLD_LIMIT, WORLD_LIMIT);
-      const ascend = keys.has(' ') || keys.has('e') || verticalInput > 0;
-      const descend = keys.has('control') || keys.has('q') || verticalInput < 0;
-      if (ascend !== descend) camera.position.y += (ascend ? 1 : -1) * (keys.has('shift') ? 48 : 24) * dt;
-      camera.position.y = THREE.MathUtils.clamp(camera.position.y, 1.4, 220);
-      updateStreaming();
+      if (inVehicle && vehicleReady) {
+        vehicleSteering = THREE.MathUtils.clamp(strafe, -1, 1);
+        if (Math.abs(forward) > 0.04) vehicleSpeed += forward * (keys.has('shift') ? 23 : 17) * dt;
+        else vehicleSpeed *= Math.exp(-1.8 * dt);
+        vehicleSpeed = THREE.MathUtils.clamp(vehicleSpeed, -10, keys.has('shift') ? 62 : 48);
+        const turnStrength = Math.min(1, Math.abs(vehicleSpeed) / 7);
+        if (turnStrength > 0) vehicleYaw -= vehicleSteering * turnStrength * 1.25 * dt * (vehicleSpeed >= 0 ? 1 : -1);
+        vehicleRoot.position.x = THREE.MathUtils.clamp(vehicleRoot.position.x + Math.cos(vehicleYaw) * vehicleSpeed * dt, -WORLD_LIMIT, WORLD_LIMIT);
+        vehicleRoot.position.z = THREE.MathUtils.clamp(vehicleRoot.position.z - Math.sin(vehicleYaw) * vehicleSpeed * dt, -WORLD_LIMIT, WORLD_LIMIT);
+        vehicleRoot.rotation.y = vehicleYaw; vehicleRoot.updateMatrixWorld(true);
+        if (steeringControl) steeringControl.rotation.x = steeringBaseX + vehicleSteering * 0.34;
+        updateStreaming();
+      } else {
+        const speed = (keys.has('shift') ? 30 : 13) * dt;
+        camera.position.x = THREE.MathUtils.clamp(camera.position.x + (Math.sin(yaw) * forward + Math.cos(yaw) * strafe) * speed, -WORLD_LIMIT, WORLD_LIMIT);
+        camera.position.z = THREE.MathUtils.clamp(camera.position.z + (-Math.cos(yaw) * forward + Math.sin(yaw) * strafe) * speed, -WORLD_LIMIT, WORLD_LIMIT);
+        const ascend = keys.has(' ') || keys.has('e') || verticalInput > 0;
+        const descend = keys.has('control') || keys.has('q') || verticalInput < 0;
+        if (ascend !== descend) camera.position.y += (ascend ? 1 : -1) * (keys.has('shift') ? 48 : 24) * dt;
+        camera.position.y = THREE.MathUtils.clamp(camera.position.y, 1.4, 220); updateStreaming();
+      }
       updateTrafficSignals(dt);
-    } else {
-      updateTrafficSignals(dt);
+    } else updateTrafficSignals(dt);
+    if (inVehicle) positionVehicleCamera();
+    else {
+      const lookDir = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
+      camera.lookAt(camera.position.clone().add(lookDir));
     }
-    const lookDir = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
-    camera.lookAt(camera.position.clone().add(lookDir));
+    updateVehicleUI();
     renderer.render(scene, camera);
   }
   requestAnimationFrame(animate);
 
   return {
     renderer, scene, camera,
+    enterVehicle, exitVehicle, toggleVehicleCamera,
+    getVehicleState() { return { ready: vehicleReady, failed: vehicleFailed, driving: inVehicle, speedKmh: Math.round(Math.abs(vehicleSpeed) * 3.6), cameraMode: vehicleCameraMode }; },
     setMoveInput(x, y) { moveX = THREE.MathUtils.clamp(x, -1, 1); moveY = THREE.MathUtils.clamp(y, -1, 1); },
     setVerticalInput(value) { verticalInput = THREE.MathUtils.clamp(value, -1, 1); },
     setPaused(value) { paused = Boolean(value); if (paused) { keys.clear(); moveX = 0; moveY = 0; verticalInput = 0; dragging = false; } },
