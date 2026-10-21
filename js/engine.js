@@ -562,7 +562,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     lastChunkZ = centerZ;
     lastRadius = radius;
     // Fog end tracks the loaded chunk ring so the world fades out before the streaming edge.
-    const fogFar = (radius * CHUNK_X + CHUNK_X * .55) * 1.35;
+    const fogFar = (radius * CHUNK_X + CHUNK_X * .55) * 1.2;
     scene.fog.near = fogFar * .44;
     scene.fog.far = fogFar;
     const wanted = new Set();
@@ -654,13 +654,14 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
   const onBlur = () => { keys.clear(); moveX = 0; moveY = 0; verticalInput = 0; dragging = false; };
   window.addEventListener('blur', onBlur);
 
+  let qualityPixelRatio = 0.9;
   let lastTime = performance.now(), sampleStart = lastTime, frames = 0, running = true;
   function resize() {
     const viewport = window.visualViewport;
     const w = Math.max(1, Math.round(viewport?.width || window.innerWidth));
     const h = Math.max(1, Math.round(viewport?.height || window.innerHeight));
     camera.aspect = w / h; camera.updateProjectionMatrix();
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.1));
+    renderer.setPixelRatio(qualityPixelRatio);
     renderer.setSize(w, h, false);
   }
   window.addEventListener('resize', resize, { passive: true });
@@ -705,8 +706,8 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     setVerticalInput(value) { verticalInput = THREE.MathUtils.clamp(value, -1, 1); },
     setPaused(value) { paused = Boolean(value); if (paused) { keys.clear(); moveX = 0; moveY = 0; verticalInput = 0; dragging = false; } },
     setQuality(level) {
-      const ratio = level === 'high' ? 1.2 : level === 'low' ? .7 : 1;
-      renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * ratio, 1.1));
+      qualityPixelRatio = level === 'high' ? 1.1 : level === 'low' ? 0.65 : 0.9;
+      renderer.setPixelRatio(qualityPixelRatio);
       resize();
     },
     dispose() {
