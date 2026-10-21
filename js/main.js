@@ -1,5 +1,5 @@
-import { initEngine } from './engine.js?v=17';
-import { initUI } from './ui.js?v=2';
+import { initEngine } from './engine.js?v=18';
+import { initUI } from './ui.js?v=3';
 
 const $ = (id) => document.getElementById(id);
 const boot = $('boot-screen');
