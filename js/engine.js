@@ -358,6 +358,37 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     if (hasWestRoad) addRoadSegment(group, 'z', x0, midZ, CHUNK_Z, westWidth, rand, westWidth >= 24 ? 'boulevard' : style);
     if (hasEastRoad) addRoadSegment(group, 'z', x0 + CHUNK_X, midZ, CHUNK_Z, eastWidth, rand, eastWidth >= 24 ? 'boulevard' : style);
 
+    // Occasional diagonal cut-throughs connect two boundary streets and break up the rigid grid.
+    const diagonalStreet = hasNorthRoad && hasWestRoad && positiveMod(cx * 3 + cz * 5, 5) === 0;
+    if (diagonalStreet) {
+      const diagonalLength = Math.sqrt(64 * 64 + 64 * 64);
+      const angle = Math.PI / 4;
+      const diagonalX = x0 + 32, diagonalZ = z0 + 32;
+      const roadGeo = new THREE.PlaneGeometry(diagonalLength, 9.5);
+      roadGeo.rotateX(-Math.PI / 2);
+      roadGeo.rotateY(angle);
+      const diagonalRoad = new THREE.Mesh(roadGeo, asphaltAltMat);
+      diagonalRoad.position.set(diagonalX, -.018, diagonalZ);
+      group.add(diagonalRoad);
+      for (const side of [-1, 1]) {
+        const offset = side * 6.1 / Math.sqrt(2);
+        const walkGeo = new THREE.PlaneGeometry(diagonalLength, 1.8);
+        walkGeo.rotateX(-Math.PI / 2);
+        walkGeo.rotateY(angle);
+        const walk = new THREE.Mesh(walkGeo, sidewalkMat);
+        walk.position.set(diagonalX + offset, .006, diagonalZ + offset);
+        group.add(walk);
+      }
+      for (let t = -39; t <= 39; t += 11) {
+        const dashGeo = new THREE.PlaneGeometry(4.5, .13);
+        dashGeo.rotateX(-Math.PI / 2);
+        dashGeo.rotateY(angle);
+        const dash = new THREE.Mesh(dashGeo, yellowPaint);
+        dash.position.set(diagonalX + t / Math.sqrt(2), .02, diagonalZ - t / Math.sqrt(2));
+        group.add(dash);
+      }
+    }
+
     // Intersection geometry only appears where both road axes really meet.
     if (hasNorthRoad && hasWestRoad) {
       const ix = x0, iz = z0;
@@ -425,6 +456,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
         if (industrial && roll < .36) continue;
         const x = x0 + centers[rx] + (lotRand() - .5) * 5.5;
         const z = z0 + centers[rz] + (lotRand() - .5) * 5.5;
+        if (diagonalStreet && Math.abs((x - x0) + (z - z0) - 64) < 13) continue;
         let name;
         let tower = false;
         if (downtown && lotRand() < .62) {
