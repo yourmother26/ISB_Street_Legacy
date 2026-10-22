@@ -1,9 +1,0 @@
-{
-  "gameName": "ISB: Street Legacy",
-  "build": "wave-1-foundation",
-  "initialFpsTarget": 30,
-  "optionalHigherFpsTarget": 60,
-  "totalContentBudgetBytes": 2000000000,
-  "threeJsSource": "official local release; version must be pinned in project notes",
-  "assetsExpected": "licensed or original assets only"
-}
