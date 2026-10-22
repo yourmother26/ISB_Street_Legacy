@@ -553,9 +553,11 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     return chunk;
   }
 
+  let performanceRadius = BASE_LOAD_RADIUS;
   let lastChunkX = NaN, lastChunkZ = NaN, lastRadius = -1;
   function updateStreaming(force = false) {
-    const radius = Math.min(3, BASE_LOAD_RADIUS + Math.floor(Math.max(0, camera.position.y - 25) / 65));
+    const desiredRadius = Math.min(3, BASE_LOAD_RADIUS + Math.floor(Math.max(0, camera.position.y - 25) / 65));
+    const radius = Math.min(desiredRadius, performanceRadius);
     const centerX = Math.floor(camera.position.x / CHUNK_X);
     const centerZ = Math.floor(camera.position.z / CHUNK_Z);
     if (!force && centerX === lastChunkX && centerZ === lastChunkZ && radius === lastRadius) return;
@@ -801,7 +803,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
   window.addEventListener('blur', onBlur);
   loadPlayerVehicle();
 
-  let qualityPixelRatio = 0.7;
+  let qualityPixelRatio = 0.78;
   let adaptiveScale = 1;
   let slowSamples = 0, fastSamples = 0;
   let lastTime = performance.now(), sampleStart = lastTime, frames = 0, running = true;
@@ -810,7 +812,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     const w = Math.max(1, Math.round(viewport?.width || window.innerWidth));
     const h = Math.max(1, Math.round(viewport?.height || window.innerHeight));
     camera.aspect = w / h; camera.updateProjectionMatrix();
-    renderer.setPixelRatio(Math.max(0.42, qualityPixelRatio * adaptiveScale));
+    renderer.setPixelRatio(Math.max(0.68, qualityPixelRatio * adaptiveScale));
     renderer.setSize(w, h, false);
   }
   window.addEventListener('resize', resize, { passive: true });
@@ -828,14 +830,25 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
       onStats({ fps, frameMs, renderer: 'WebGL · adaptive mobile quality' });
       // Landscape renders more pixels. Lower resolution only after sustained slow frames,
       // then restore it gradually when the phone has spare performance.
-      if (fps < 19) { slowSamples++; fastSamples = 0; }
-      else if (fps > 31) { fastSamples++; slowSamples = 0; }
+      if (fps < 15) { slowSamples++; fastSamples = 0; }
+      else if (fps > 25) { fastSamples++; slowSamples = 0; }
       else { slowSamples = Math.max(0, slowSamples - 1); fastSamples = 0; }
-      if (slowSamples >= 3 && adaptiveScale > 0.62) {
-        adaptiveScale = Math.max(0.62, adaptiveScale - 0.12);
+      // First reduce scene complexity rather than making the whole image excessively soft.
+      if (slowSamples >= 3 && performanceRadius > 1) {
+        performanceRadius = 1;
+        slowSamples = 0;
+        updateStreaming(true);
+      } else if (fastSamples >= 10 && performanceRadius < BASE_LOAD_RADIUS) {
+        performanceRadius = BASE_LOAD_RADIUS;
+        fastSamples = 0;
+        updateStreaming(true);
+      }
+      // Keep resolution in a narrower range; scene complexity is the first lever.
+      if (slowSamples >= 4 && adaptiveScale > 0.86) {
+        adaptiveScale = 0.86;
         slowSamples = 0; resize();
       } else if (fastSamples >= 8 && adaptiveScale < 1) {
-        adaptiveScale = Math.min(1, adaptiveScale + 0.06);
+        adaptiveScale = Math.min(1, adaptiveScale + 0.035);
         fastSamples = 0; resize();
       }
       frames = 0; sampleStart = now;
@@ -886,8 +899,10 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     setVerticalInput(value) { verticalInput = THREE.MathUtils.clamp(value, -1, 1); },
     setPaused(value) { paused = Boolean(value); if (paused) { keys.clear(); moveX = 0; moveY = 0; verticalInput = 0; dragging = false; } },
     setQuality(level) {
-      qualityPixelRatio = level === 'high' ? 0.9 : level === 'low' ? 0.5 : 0.7;
+      qualityPixelRatio = level === 'high' ? 0.9 : level === 'low' ? 0.68 : 0.78;
       adaptiveScale = 1; slowSamples = 0; fastSamples = 0;
+      performanceRadius = BASE_LOAD_RADIUS;
+      updateStreaming(true);
       resize();
     },
     dispose() {
