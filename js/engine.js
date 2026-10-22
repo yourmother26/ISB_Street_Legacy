@@ -15,6 +15,21 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
+  // GPU/device hints are only a starting estimate; live frame performance makes the final decisions.
+  let gpuRendererName = '';
+  try {
+    const gl = renderer.getContext();
+    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    if (debugInfo) gpuRendererName = String(gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || '');
+  } catch (_) {}
+  const deviceMemory = Number(navigator.deviceMemory || 4);
+  const cpuCores = Number(navigator.hardwareConcurrency || 4);
+  const rendererLower = gpuRendererName.toLowerCase();
+  const weakGpuName = /swiftshader|llvmpipe|mali-4\d\d|adreno\s*3\d\d|powervr\s*sgx/i.test(gpuRendererName);
+  const gpuTier = weakGpuName || deviceMemory <= 3 || cpuCores <= 4 ? 'low'
+    : deviceMemory >= 8 && cpuCores >= 8 ? 'high' : 'medium';
+  const maxAdaptiveRadius = gpuTier === 'high' ? 3 : gpuTier === 'low' ? 1 : 2;
+
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xa8cce8);
   scene.fog = new THREE.Fog(0xa8cce8, 110, 245);
@@ -553,10 +568,11 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     return chunk;
   }
 
-  let performanceRadius = BASE_LOAD_RADIUS;
+  let performanceRadius = gpuTier === 'high' ? 3 : gpuTier === 'low' ? 1 : BASE_LOAD_RADIUS;
   let lastChunkX = NaN, lastChunkZ = NaN, lastRadius = -1;
   function updateStreaming(force = false) {
-    const desiredRadius = Math.min(3, BASE_LOAD_RADIUS + Math.floor(Math.max(0, camera.position.y - 25) / 65));
+    const heightBonus = Math.floor(Math.max(0, camera.position.y - 25) / 65);
+    const desiredRadius = Math.min(maxAdaptiveRadius, BASE_LOAD_RADIUS + heightBonus + (maxAdaptiveRadius > BASE_LOAD_RADIUS ? 1 : 0));
     const radius = Math.min(desiredRadius, performanceRadius);
     const centerX = Math.floor(camera.position.x / CHUNK_X);
     const centerZ = Math.floor(camera.position.z / CHUNK_Z);
@@ -803,7 +819,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
   window.addEventListener('blur', onBlur);
   loadPlayerVehicle();
 
-  let qualityPixelRatio = 0.78;
+  let qualityPixelRatio = gpuTier === 'high' ? 1 : gpuTier === 'low' ? 0.82 : 0.9;
   let adaptiveScale = 1;
   let slowSamples = 0, fastSamples = 0;
   let lastTime = performance.now(), sampleStart = lastTime, frames = 0, running = true;
@@ -827,29 +843,33 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     if (now - sampleStart >= 600) {
       const fps = Math.round(frames * 1000 / (now - sampleStart));
       const frameMs = Math.round((now - sampleStart) / Math.max(frames, 1) * 10) / 10;
-      onStats({ fps, frameMs, renderer: 'WebGL · adaptive mobile quality' });
+      onStats({ fps, frameMs, renderer: 'WebGL · GPU-adaptive ' + gpuTier, gpuTier, gpuRenderer: gpuRendererName });
       // Landscape renders more pixels. Lower resolution only after sustained slow frames,
       // then restore it gradually when the phone has spare performance.
-      if (fps < 15) { slowSamples++; fastSamples = 0; }
-      else if (fps > 25) { fastSamples++; slowSamples = 0; }
+      if (fps < 20) { slowSamples++; fastSamples = 0; }
+      else if (fps > (gpuTier === 'high' ? 38 : 29)) { fastSamples++; slowSamples = 0; }
       else { slowSamples = Math.max(0, slowSamples - 1); fastSamples = 0; }
-      // First reduce scene complexity rather than making the whole image excessively soft.
+
+      // Adjust the world first, so weak phones do not have to blur the entire image to stay smooth.
       if (slowSamples >= 3 && performanceRadius > 1) {
-        performanceRadius = 1;
+        performanceRadius--;
         slowSamples = 0;
         updateStreaming(true);
-      } else if (fastSamples >= 10 && performanceRadius < BASE_LOAD_RADIUS) {
-        performanceRadius = BASE_LOAD_RADIUS;
+      } else if (slowSamples >= 3 && performanceRadius === 1 && adaptiveScale > 0.72) {
+        adaptiveScale = Math.max(0.72, adaptiveScale - 0.07);
+        slowSamples = 0;
+        resize();
+      }
+
+      // Expand the view on phones with sustained headroom; never exceed the tier's limit.
+      if (fastSamples >= 10 && performanceRadius < maxAdaptiveRadius) {
+        performanceRadius++;
         fastSamples = 0;
         updateStreaming(true);
-      }
-      // Keep resolution in a narrower range; scene complexity is the first lever.
-      if (slowSamples >= 4 && adaptiveScale > 0.86) {
-        adaptiveScale = 0.86;
-        slowSamples = 0; resize();
       } else if (fastSamples >= 8 && adaptiveScale < 1) {
         adaptiveScale = Math.min(1, adaptiveScale + 0.035);
-        fastSamples = 0; resize();
+        fastSamples = 0;
+        resize();
       }
       frames = 0; sampleStart = now;
     }
@@ -899,9 +919,9 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     setVerticalInput(value) { verticalInput = THREE.MathUtils.clamp(value, -1, 1); },
     setPaused(value) { paused = Boolean(value); if (paused) { keys.clear(); moveX = 0; moveY = 0; verticalInput = 0; dragging = false; } },
     setQuality(level) {
-      qualityPixelRatio = level === 'high' ? 0.9 : level === 'low' ? 0.68 : 0.78;
+      qualityPixelRatio = level === 'high' ? 1 : level === 'low' ? 0.72 : (gpuTier === 'low' ? 0.82 : 0.9);
       adaptiveScale = 1; slowSamples = 0; fastSamples = 0;
-      performanceRadius = BASE_LOAD_RADIUS;
+      performanceRadius = gpuTier === 'high' ? maxAdaptiveRadius : gpuTier === 'low' ? 1 : BASE_LOAD_RADIUS;
       updateStreaming(true);
       resize();
     },

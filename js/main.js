@@ -1,4 +1,4 @@
-import { initEngine } from './engine.js?v=20';
+import { initEngine } from './engine.js?v=21';
 import { initUI } from './ui.js?v=3';
 
 const $ = (id) => document.getElementById(id);
