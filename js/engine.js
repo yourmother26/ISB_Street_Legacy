@@ -623,16 +623,54 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
   }
 
 
-  // Player-owned Spectral GT RS, loaded asynchronously from its public-domain GLB.
+  // Player car: always show a local fallback immediately, then upgrade to the detailed GLB.
   const vehicleRoot = new THREE.Group();
   vehicleRoot.name = 'player-spectral-gt-rs';
   vehicleRoot.position.set(0, 0.01, 10);
   vehicleRoot.rotation.y = Math.PI / 2;
-  vehicleRoot.visible = false;
   scene.add(vehicleRoot);
   let vehicleReady = false, vehicleFailed = false, inVehicle = false;
   let vehicleSpeed = 0, vehicleSteering = 0, vehicleYaw = Math.PI / 2;
   let vehicleCameraMode = 'cockpit', steeringControl = null, steeringBaseX = 0;
+  let fallbackCar = null;
+
+  function createFallbackCar() {
+    const car = new THREE.Group();
+    car.name = 'visible-fallback-sports-car';
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x147de0, metalness: .58, roughness: .28 });
+    const darkMat = new THREE.MeshStandardMaterial({ color: 0x111923, metalness: .25, roughness: .2 });
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x5aa9cb, metalness: .25, roughness: .16 });
+    const lampMat = new THREE.MeshBasicMaterial({ color: 0xe7f6ff });
+    const tailMat = new THREE.MeshBasicMaterial({ color: 0xff2525 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(4.4, .68, 1.92), bodyMat);
+    body.position.set(0, .62, 0); car.add(body);
+    const hood = new THREE.Mesh(new THREE.BoxGeometry(1.22, .24, 1.78), bodyMat);
+    hood.position.set(1.28, .94, 0); car.add(hood);
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.72, .72, 1.45), darkMat);
+    cabin.position.set(-.25, 1.22, 0); car.add(cabin);
+    const windscreen = new THREE.Mesh(new THREE.BoxGeometry(.08, .49, 1.31), glassMat);
+    windscreen.position.set(.62, 1.3, 0); windscreen.rotation.z = -.16; car.add(windscreen);
+    const rearGlass = new THREE.Mesh(new THREE.BoxGeometry(.08, .43, 1.3), glassMat);
+    rearGlass.position.set(-1.05, 1.29, 0); rearGlass.rotation.z = .35; car.add(rearGlass);
+    for (const x of [-1.35, 1.35]) {
+      for (const z of [-1.01, 1.01]) {
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(.39, .39, .22, 12), darkMat);
+        wheel.rotation.x = Math.PI / 2; wheel.position.set(x, .4, z); car.add(wheel);
+      }
+    }
+    for (const z of [-.62, .62]) {
+      const head = new THREE.Mesh(new THREE.BoxGeometry(.13, .18, .35), lampMat);
+      head.position.set(2.19, .72, z); car.add(head);
+      const tail = new THREE.Mesh(new THREE.BoxGeometry(.1, .16, .34), tailMat);
+      tail.position.set(-2.22, .7, z); car.add(tail);
+    }
+    vehicleRoot.add(car);
+    fallbackCar = car;
+    vehicleRoot.visible = true;
+    vehicleReady = true;
+    updateVehicleUI();
+  }
+  createFallbackCar();
 
   function canEnterVehicle() {
     return vehicleReady && !inVehicle && Math.hypot(camera.position.x - vehicleRoot.position.x, camera.position.z - vehicleRoot.position.z) < 8;
@@ -697,14 +735,32 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
           material.needsUpdate = true;
         }
       });
+      car.updateMatrixWorld(true);
+      const bounds = new THREE.Box3().setFromObject(car);
+      const size = bounds.getSize(new THREE.Vector3());
+      const center = bounds.getCenter(new THREE.Vector3());
+      if (!(size.x > 0 && size.y > 0 && size.z > 0)) throw new Error('Car model has empty dimensions.');
+      car.position.set(-center.x, -bounds.min.y, -center.z);
+      car.scale.setScalar(Math.min(4.8 / size.x, 1.7 / size.y, 2.05 / size.z));
+      car.position.multiplyScalar(car.scale.x);
+      if (fallbackCar) {
+        vehicleRoot.remove(fallbackCar);
+        fallbackCar.traverse(object => {
+          if (!object.isMesh) return;
+          object.geometry.dispose();
+          const mats = Array.isArray(object.material) ? object.material : [object.material];
+          mats.forEach(mat => mat.dispose());
+        });
+        fallbackCar = null;
+      }
       vehicleRoot.add(car);
       steeringControl = car.getObjectByName('STEERING_INPUT_CTRL');
       if (steeringControl) steeringBaseX = steeringControl.rotation.x;
-      vehicleRoot.visible = true; vehicleReady = true; updateVehicleUI();
+      vehicleRoot.visible = true; vehicleReady = true; vehicleFailed = false; updateVehicleUI();
     } catch (error) {
       vehicleFailed = true;
-      console.warn('[ISB Street Legacy] Spectral GT RS could not load from its public GLB source.', error);
-      updateVehicleUI();
+      console.warn('[ISB Street Legacy] Detailed car model failed; using built-in fallback car.', error);
+      vehicleRoot.visible = true; vehicleReady = true; updateVehicleUI();
     }
   }
 
@@ -746,13 +802,15 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
   loadPlayerVehicle();
 
   let qualityPixelRatio = 0.7;
+  let adaptiveScale = 1;
+  let slowSamples = 0, fastSamples = 0;
   let lastTime = performance.now(), sampleStart = lastTime, frames = 0, running = true;
   function resize() {
     const viewport = window.visualViewport;
     const w = Math.max(1, Math.round(viewport?.width || window.innerWidth));
     const h = Math.max(1, Math.round(viewport?.height || window.innerHeight));
     camera.aspect = w / h; camera.updateProjectionMatrix();
-    renderer.setPixelRatio(qualityPixelRatio);
+    renderer.setPixelRatio(Math.max(0.42, qualityPixelRatio * adaptiveScale));
     renderer.setSize(w, h, false);
   }
   window.addEventListener('resize', resize, { passive: true });
@@ -765,7 +823,21 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     const dt = Math.min((now - lastTime) / 1000, .05);
     lastTime = now; frames++;
     if (now - sampleStart >= 600) {
-      onStats({ fps: Math.round(frames * 1000 / (now - sampleStart)), frameMs: Math.round((now - sampleStart) / Math.max(frames, 1) * 10) / 10, renderer: 'WebGL · redesigned streamed city' });
+      const fps = Math.round(frames * 1000 / (now - sampleStart));
+      const frameMs = Math.round((now - sampleStart) / Math.max(frames, 1) * 10) / 10;
+      onStats({ fps, frameMs, renderer: 'WebGL · adaptive mobile quality' });
+      // Landscape renders more pixels. Lower resolution only after sustained slow frames,
+      // then restore it gradually when the phone has spare performance.
+      if (fps < 19) { slowSamples++; fastSamples = 0; }
+      else if (fps > 31) { fastSamples++; slowSamples = 0; }
+      else { slowSamples = Math.max(0, slowSamples - 1); fastSamples = 0; }
+      if (slowSamples >= 3 && adaptiveScale > 0.62) {
+        adaptiveScale = Math.max(0.62, adaptiveScale - 0.12);
+        slowSamples = 0; resize();
+      } else if (fastSamples >= 8 && adaptiveScale < 1) {
+        adaptiveScale = Math.min(1, adaptiveScale + 0.06);
+        fastSamples = 0; resize();
+      }
       frames = 0; sampleStart = now;
     }
     if (!paused) {
@@ -815,7 +887,7 @@ export async function initEngine(canvas, { onStats = () => {} } = {}) {
     setPaused(value) { paused = Boolean(value); if (paused) { keys.clear(); moveX = 0; moveY = 0; verticalInput = 0; dragging = false; } },
     setQuality(level) {
       qualityPixelRatio = level === 'high' ? 0.9 : level === 'low' ? 0.5 : 0.7;
-      renderer.setPixelRatio(qualityPixelRatio);
+      adaptiveScale = 1; slowSamples = 0; fastSamples = 0;
       resize();
     },
     dispose() {
